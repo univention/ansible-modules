@@ -1,3 +1,4 @@
+---
 - hosts: my-testservers
   tasks:
     - name: create a user
@@ -73,7 +74,7 @@
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
-        options: 
+        options:
           - default
           - pki
     - name: modify testuser3 - remove an option
@@ -81,11 +82,10 @@
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
-        options: 
+        options:
           - default
     - name: delete testuser3
       univention_udm:
         module: 'users/user'
         state: 'present'
         filter: 'uid=testuser3'
-
