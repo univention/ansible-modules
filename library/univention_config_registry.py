@@ -91,11 +91,19 @@ def _set_keys(keys, result, module):
     ucr = ConfigRegistry()
     ucr.load()
 
-    to_set = []
+    def needs_change(key):
+        if key not in ucr:
+            return True
+        if isinstance(keys[key], bool):
+            if keys[key] and not ucr.is_true(key):
+                return True
+            elif not keys[key] and not ucr.is_false(key):
+                return True
+        elif ucr[key] != keys[key]:
+            return True
+        return False
 
-    for key in keys:
-        if not (key in ucr) or not ucr[key] or (ucr[key] != keys[key]):
-            to_set.append(key)
+    to_set = list(filter(needs_change, keys))
 
     result['changed'] = len(to_set) > 0
     if not result['changed']:
