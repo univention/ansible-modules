@@ -66,7 +66,7 @@ EXAMPLES = '''
     keys:
       proxy/http:
       proxy/https:
-    present: absent
+    state: absent
 '''
 
 RETURN = '''
