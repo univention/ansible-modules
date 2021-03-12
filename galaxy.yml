@@ -1,0 +1,15 @@
+---
+namespace: "univention"
+name: "modules"
+version: "1.0.0"
+readme: "README.md"
+authors:
+    - "Lukas Zumvorde <zumvorde@univention.de>"
+    - "Oliver Friedrich <friedrich@univention.de>"
+description: "Collection of modules for the Univention Corporate Server"
+license_file: "LICENSE"
+homepage: "https://www.univention.com"
+tags:
+    - univention
+    - collection
+repository: "https://github.com/univention/ansible-modules"
