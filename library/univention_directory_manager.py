@@ -8,7 +8,7 @@ ANSIBLE_METADATA = {
 
 DOCUMENTATION = '''
 ---
-module: univention_udm
+module: univention_directory_manager
 
 short_description: Accessing the Univention Directory Manager
 
@@ -63,7 +63,7 @@ author:
 EXAMPLES = '''
 # create a new user object
 - name: create a user
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'present'
@@ -77,7 +77,7 @@ EXAMPLES = '''
 
 # delete one or more objects
 - name: delete a user with a search filter
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'absent'
@@ -85,7 +85,7 @@ EXAMPLES = '''
 
 # use position to place the object in the directory tree
 - name: create a user with position
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'present'
@@ -100,7 +100,7 @@ EXAMPLES = '''
 
 # delete on very specific object
 - name: delete the user with position
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'absent'
@@ -108,7 +108,7 @@ EXAMPLES = '''
 
 # add or change specific properties
 - name: modify testuser3 - add or change a property
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'present'
@@ -119,7 +119,7 @@ EXAMPLES = '''
 
 # remove specific properties
 - name: modify testuser3 - remove property
-  univention_udm:
+  univention_directory_manager:
     module: 'users/user'
     action: 'modify'
     state: 'present'
