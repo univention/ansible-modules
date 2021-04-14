@@ -2,7 +2,7 @@
 - hosts: my-testservers
   tasks:
     - name: create a user
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         set_properties:
@@ -13,12 +13,12 @@
           - property: 'password'
             value: 'univention'
     - name: delete a user with a search filter
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'absent'
         filter: '(uid=testuser1)'
     - name: create a user with position
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         position: 'cn=users,ou=DEMOSCHOOL,dc=t1,dc=intranet'
@@ -30,12 +30,12 @@
           - property: 'password'
             value: 'univention'
     - name: delete the user with position
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'absent'
         dn: 'uid=testuser2,cn=users,ou=DEMOSCHOOL,dc=t1,dc=intranet'
     - name: create testuser3
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         set_properties:
@@ -46,7 +46,7 @@
           - property: 'password'
             value: 'univention'
     - name: modify testuser3 - add property
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
@@ -54,7 +54,7 @@
           - property: 'firstname'
             value: 'max'
     - name: modify testuser3 - change property
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
@@ -62,7 +62,7 @@
           - property: 'lastname'
             value: 'mustermann'
     - name: modify testuser3 - remove property
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
@@ -70,7 +70,7 @@
           - property: 'firstname'
             value: 'does not matter'
     - name: modify testuser3 - add an option
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
@@ -78,14 +78,14 @@
           - default
           - pki
     - name: modify testuser3 - remove an option
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: '(uid=testuser3)'
         options:
           - default
     - name: delete testuser3
-      univention_udm:
+      univention_directory_manager:
         module: 'users/user'
         state: 'present'
         filter: 'uid=testuser3'
