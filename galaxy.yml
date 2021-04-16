@@ -6,10 +6,10 @@
 namespace: univention
 
 # The name of the collection. Has the same character restrictions as 'namespace'
-name: ansible_modules
+name: ucs_modules
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 1.0.0
+version: 0.0.3
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -28,7 +28,7 @@ description: Ansible modules for Univention UCS
 # Either a single license or a list of licenses for content inside of a collection. Ansible Galaxy currently only
 # accepts L(SPDX,https://spdx.org/licenses/) licenses. This key is mutually exclusive with 'license_file'
 license:
-- AGPLv3
+- GPL-3.0-or-later
 
 # The path to the license file for the collection. This path is relative to the root of the collection. This key is
 # mutually exclusive with 'license'

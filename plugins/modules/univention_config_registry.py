@@ -1,12 +1,5 @@
 #!/usr/bin/python
-
-ANSIBLE_METADATA = {
-    'metadata_version': '1.1',
-    'status': ['preview'],
-    'supported_by': 'community'
-}
-
-DOCUMENTATION = '''
+DOCUMENTATION = r'''
 ---
 module: univention_config_registry
 
