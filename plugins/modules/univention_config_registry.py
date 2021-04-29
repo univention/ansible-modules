@@ -13,7 +13,7 @@ options:
         description:
             - A dict of keys to set or unset. In case of unsetting, the values
               are ignored.
-            - Either this or 'kvlist' must be given.
+            - Either this, 'kvlist' or 'commit' must be given.
         type: str
         required: false
     kvlist:
@@ -22,7 +22,7 @@ options:
               a dict via 'keys'. Each of the dicts passed via 'kvlist' must
               contain the keys 'key' and 'value'. This allows the use of Jinja
               in the UCR keys to set/unset.
-            - Either this or 'keys' must be given.
+            - Either this, 'keys' or 'commit' must be given.
         required: false
     state:
         description:
@@ -32,9 +32,16 @@ options:
         type: str
         choices: [ absent, present ]
         default: present
+    commit:
+        description:
+            - A list of destination filenames as strings to be commited.
+            - Either this, 'keys' or 'kvlist' must be given.
+        type: list
+        required: false
 
 author:
     - Moritz Bunkus (@MoritzBunkus)
+    - Jan-Luca Kiok (@jlkDE)
 '''
 
 EXAMPLES = '''
@@ -60,25 +67,73 @@ EXAMPLES = '''
       proxy/http:
       proxy/https:
     state: absent
+
+# Commit templates
+- name: Commit resolv.conf and aliases
+    univention_config_registry:
+    commit:
+      - /etc/resolv.conf
+      - /etc/aliases
 '''
 
 RETURN = '''
 meta['changed_keys']:
     description: A list of all key names that were changed
     type: array
+meta['commited_templates']:
+    description: A list of all templates that were changed
+    type: array
 message:
     description: A human-readable information about which keys where changed
 '''
 
 import datetime
-import pprint
 from ansible.module_utils.basic import AnsibleModule
 
 try:
     from univention.config_registry.backend import ConfigRegistry
+    from univention.config_registry import configHandlers
     have_config_registry = True
 except ImportError:
     have_config_registry = False
+
+def _commit_files(files, result, module):
+    result['changed'] = len(files) > 0
+
+    if not result['changed']:
+        result['message'] = "No files need to be unset"
+
+    if module.check_mode:
+        if len(files) > 0:
+            result['message'] = "These files will be commited: {}".format(" ".join(files))
+        return
+
+    if not result['changed']:
+        return
+
+    startd = datetime.datetime.now()
+
+    ucr = ConfigRegistry()
+    ucr.load()
+
+    ucr_handlers = configHandlers()
+    ucr_handlers.load()
+    ucr_handlers.update()
+
+    ucr_handlers.commit(ucr, files)
+
+    endd                                 = datetime.datetime.now()
+    result['start']                      = str(startd)
+    result['end']                        = str(endd)
+    result['delta']                      = str(endd - startd)
+    result['meta']['commited_templates'] = files
+    result['message']                    = "These files were be commited: {}".format(" ".join(files))
+    result['failed']                     = 0
+
+    # FIXME: Currently the function cannot fail
+    # if error != 0:
+    #     module.fail_json(msg='non-zero return code', **result)
+
 
 def _set_keys(keys, result, module):
     ucr = ConfigRegistry()
@@ -161,7 +216,7 @@ def _unset_keys(keys, result, module):
     result['rc']                   = rc
     result['message']              = "These keys were unset: {}".format(" ".join(to_unset))
     result['meta']['changed_keys'] = to_unset
-    result['failed']               = rc != 0 
+    result['failed']               = rc != 0
 
     if rc != 0:
         module.fail_json(msg='non-zero return code', **result)
@@ -171,7 +226,8 @@ def run_module():
     module_args = dict(
         keys=dict(type='dict', aliases=['name', 'key']),
         kvlist=dict(type='list'),
-        state=dict(type='str', default='present', choices=['present', 'absent'])
+        state=dict(type='str', default='present', choices=['present', 'absent']),
+        commit=dict(type='list')
     )
 
     module = AnsibleModule(
@@ -181,18 +237,19 @@ def run_module():
 
     result = dict(
         changed=False,
-        meta=dict(changed_keys=[]),
+        meta=dict(changed_keys=[], commited_templates=[]),
         message=''
     )
 
     if not have_config_registry:
         module.fail_json(msg='The Python "univention.config_registry.backend" is not available', **result)
 
-    if not (('keys' in module.params and module.params['keys']) or ('kvlist' in module.params and module.params['kvlist'])):
-        module.fail_json(msg='Either "keys" or "kvlist" is required.', **result)
+    if not (('keys' in module.params and module.params['keys']) or ('kvlist' in module.params and module.params['kvlist']) or ('commit' in module.params and module.params['commit'])):
+        module.fail_json(msg='Either "keys", "kvlist" or "commit" is required.', **result)
 
-    state = module.params['state']
-    keys  = module.params['keys'] if 'keys' in module.params and module.params['keys'] else dict()
+    state  = module.params['state']
+    keys   = module.params['keys'] if 'keys' in module.params and module.params['keys'] else dict()
+    commit = module.params['commit'] if 'commit' in module.params and module.params['commit'] else list()
 
     if 'kvlist' in module.params and module.params['kvlist']:
         for entry in module.params['kvlist']:
@@ -201,13 +258,15 @@ def run_module():
     if (state != 'present') and (state != 'absent'):
         module.fail_json(msg='The state "{0}" is invalid'.format(state), **result)
 
-    if len(keys) == 0:
-        module.fail_json(msg='Missing keys', **result)
-
-    if state == 'present':
-        _set_keys(keys, result, module)
+    if len(keys) != 0:
+        if state == 'present':
+            _set_keys(keys, result, module)
+        else:
+            _unset_keys(keys, result, module)
+    elif len(commit) != 0:
+        _commit_files(commit, result, module)
     else:
-        _unset_keys(keys, result, module)
+        module.fail_json(msg='Missing keys or files', **result)
 
     module.exit_json(**result)
 
