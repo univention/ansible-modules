@@ -119,8 +119,8 @@ def _set_keys(keys, result, module):
     result['start']                = str(startd)
     result['end']                  = str(endd)
     result['delta']                = str(endd - startd)
-    result['out']                  = out.rstrip(b"\r\n")
-    result['err']                  = err.rstrip(b"\r\n")
+    result['out']                  = out.rstrip("\r\n")
+    result['err']                  = err.rstrip("\r\n")
     result['rc']                   = rc
     result['message']              = "These keys were set: {}".format(" ".join(to_set))
     result['meta']['changed_keys'] = to_set
@@ -156,12 +156,12 @@ def _unset_keys(keys, result, module):
     result['start']                = str(startd)
     result['end']                  = str(endd)
     result['delta']                = str(endd - startd)
-    result['out']                  = out.rstrip(b"\r\n")
-    result['err']                  = err.rstrip(b"\r\n")
+    result['out']                  = out.rstrip("\r\n")
+    result['err']                  = err.rstrip("\r\n")
     result['rc']                   = rc
     result['message']              = "These keys were unset: {}".format(" ".join(to_unset))
     result['meta']['changed_keys'] = to_unset
-    result['failed']               = rc != 0 
+    result['failed']               = rc != 0
 
     if rc != 0:
         module.fail_json(msg='non-zero return code', **result)

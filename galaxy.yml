@@ -9,7 +9,7 @@ namespace: univention
 name: ucs_modules
 
 # The version of the collection. Must be compatible with semantic versioning
-version: 0.0.3
+version: 0.0.4-alpha
 
 # The path to the Markdown (.md) readme file. This path is relative to the root of the collection
 readme: README.md
@@ -17,7 +17,7 @@ readme: README.md
 # A list of the collection's content authors. Can be just the name or in the format 'Full Name <email> (url)
 # @nicks:irc/im.site#channel'
 authors:
-- Dominik Kaminski <kaminski@univention.de>
+  - Univention GmbH
 
 
 ### OPTIONAL but strongly recommended
@@ -47,13 +47,21 @@ tags:
 dependencies: {}
 
 # The URL of the originating SCM repository
-repository: https://git.knut.univention.de/univention/internal/ansible-modules.git
+repository: https://github.com/univention/ansible-modules
 
 # The URL to any online docs
 #documentation: http://docs.example.com
 
 # The URL to the homepage of the collection/project
-#homepage: http://example.com
+homepage: https://www.univention.com
 
 # The URL to the collection issue tracker
 issues: https://forge.univention.org
+
+# Ignore irrelevant files
+build_ignore:
+  - .gitlab-ci.yml
+  - .gitkeep
+  - .gitignore
+  - '*.tar.gz'
+  - ci
