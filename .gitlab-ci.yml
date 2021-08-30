@@ -60,7 +60,6 @@ lint:
     variables:
       - $DISABLE_LINT =~ "true"
   script:
-    - ln -s ${CI_BUILDS_DIR}/ci-tooling/linting/.yamllint ${CI_PROJECT_DIR}/.yamllint
     - |
       if ! test -z ${VAULT_PASSWORD}
       then
