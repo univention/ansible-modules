@@ -19,7 +19,7 @@ stages:
       else
         VERSION=${RELEASE_VERSION};
       fi
-    - sed -i "/version. [0-9]\.[0-9]\.[0-9]/s/[0-9]\.[0-9]\.[0-9]/$VERSION/" galaxy.yml
+    - sed -i "/version. \"[0-9]\.[0-9]\.[0-9]\"/s/[0-9]\.[0-9]\.[0-9]/$VERSION/" galaxy.yml
   image: artifacts.knut.univention.de/upx/container-tooling/automation-ansible:main-41a9520a
   script:
     - ansible-galaxy collection build

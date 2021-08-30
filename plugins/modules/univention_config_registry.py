@@ -90,10 +90,10 @@ message:
     description: A human-readable information about which keys where changed
 '''
 
-
 try:
     from univention.config_registry.backend import ConfigRegistry
     from univention.config_registry import configHandlers
+
     have_config_registry = True
 except ImportError:
     have_config_registry = False
