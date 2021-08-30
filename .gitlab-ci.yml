@@ -1,0 +1,100 @@
+stages:
+  - .pre
+  - prepare
+  - release
+  - publish
+
+.publish-common:
+  artifacts:
+    paths:
+      - univention-ucs_modules-*
+    expire_in: 14 days
+  before_script:
+    # Check if release has to be build
+    - if [ -z "$RELEASE_VERSION" ]; then exit 0; fi
+    # Set new semantic-release version
+    - if [[ ${CI_COMMIT_BRANCH} != "main" ]];
+      then
+        VERSION=${RELEASE_VERSION}-dev${CI_PIPELINE_IID};
+      else
+        VERSION=${RELEASE_VERSION};
+      fi
+    - sed -i "/version. [0-9]\.[0-9]\.[0-9]/s/[0-9]\.[0-9]\.[0-9]/$VERSION/" galaxy.yml
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-ansible:main-41a9520a
+  script:
+    - ansible-galaxy collection build
+    - ansible-galaxy collection publish --api-key ${ANSIBLE_GALAXY_API_KEY} univention-ucs_modules-${VERSION}.tar.gz
+  stage: publish
+  variables:
+    GIT_DEPTH: "1"
+
+.common-semantic-release:
+  except:
+    - triggers
+    - tags
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-semantic-release:main-41a9520a
+  stage: prepare
+  variables:
+    GIT_STRATEGY: clone
+    NODE_EXTRA_CA_CERTS: "/usr/local/share/ca-certificates/ucs-root-ca.crt"
+
+prepare:
+  artifacts:
+    reports:
+      dotenv: ${CI_PROJECT_DIR}/deploy.env
+  extends: .common-semantic-release
+  script:
+    - echo RELEASE_VERSION=$(semantic-release --dry-run --branches $CI_COMMIT_REF_NAME --plugins "@semantic-release/gitlab" | grep -oP "Published release [0-9]+\.[0-9]+\.[0-9]+ on" | grep -oP "[0-9]+\.[0-9]+\.[0-9]+") > ${CI_PROJECT_DIR}/deploy.env
+    - cat ${CI_PROJECT_DIR}/deploy.env
+  stage: prepare
+
+lint:
+  before_script:
+    - rm -rf ${CI_BUILDS_DIR}/ci-tooling
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/univention/customers/dataport/deployment/ci-tooling.git ${CI_BUILDS_DIR}/ci-tooling
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-linting:main-41a9520a
+  except:
+    refs:
+      - triggers
+      - tags
+    variables:
+      - $DISABLE_LINT =~ "true"
+  script:
+    - ln -s ${CI_BUILDS_DIR}/ci-tooling/linting/.yamllint ${CI_PROJECT_DIR}/.yamllint
+    - |
+      if ! test -z ${VAULT_PASSWORD}
+      then
+        ln -s ${VAULT_PASSWORD} ${VAULT_PASSWORD_PATH}
+      fi
+    - pre-commit run --all-files --config ${CI_BUILDS_DIR}/ci-tooling/ci/linting/.pre-commit-config.yaml --verbose
+  stage: prepare
+
+release:
+  artifacts:
+    paths:
+      - CHANGELOG.md
+  extends: .common-semantic-release
+  only:
+    - main
+  script:
+    - |
+      if test -f "${CI_PROJECT_DIR}/.releaserc"
+      then
+        PLUGINS=
+      else
+        PLUGINS="--plugins @semantic-release/gitlab,@semantic-release/release-notes-generator,@semantic-release/changelog"
+      fi
+    - semantic-release --branches $CI_COMMIT_REF_NAME $PLUGINS
+  stage: release
+
+publish-main:
+  extends: .publish-common
+  only:
+    - main
+
+publish-mr:
+  except:
+    - main
+    - tags
+  extends: .publish-common
+  when: manual
