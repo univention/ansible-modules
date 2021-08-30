@@ -16,6 +16,7 @@ rules:
     level: "error"
 
   line-length:
+    max: 120
     level: "warning"
 
   new-line-at-end-of-file:
@@ -23,8 +24,7 @@ rules:
 
   quoted-strings:
     quote-type: "double"
-    required: only-when-needed
-    extra-required: ["^(?:(?!(var_)).)*$"]
+    required: true
 
   truthy:
     level: "error"
