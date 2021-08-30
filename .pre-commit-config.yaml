@@ -1,0 +1,33 @@
+---
+# reference: https://pre-commit.com
+
+repos:
+  - repo: "https://github.com/pre-commit/pre-commit-hooks"
+    rev: "v3.4.0"
+    hooks:
+      - id: "check-added-large-files"
+      - id: "check-case-conflict"
+      - id: "check-docstring-first"
+      - id: "check-executables-have-shebangs"
+      - id: "check-json"
+      - id: "check-symlinks"
+      - id: "detect-private-key"
+      - id: "end-of-file-fixer"
+      - id: "trailing-whitespace"
+
+  - repo: "https://github.com/adrienverge/yamllint"
+    rev: "v1.26.1"
+    hooks:
+      - id: "yamllint"
+        args:
+          - "-c=.yamllint"
+
+  - repo: "https://github.com/ansible/ansible-lint"
+    rev: "v5.0.8"
+    hooks:
+      - id: "ansible-lint"
+
+  - repo: "https://gitlab.com/pycqa/flake8"
+    rev: "3.9.2"
+    hooks:
+      - id: "flake8"
