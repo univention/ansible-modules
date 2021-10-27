@@ -1,0 +1,18 @@
+- name: Set keys
+  univention_config_registry:
+    keys:
+      system/stats/cron: 1 2 3 4 5
+      ansible/foo: bar
+
+- name: Set /etc/hosts entries
+  univention_config_registry:
+    kvlist:
+      - key: "hosts/static/{{ item }}"
+        value: invalid.intranet
+  loop: [ '192.168.0.1', '192.168.1.1' ]
+
+- name: Clear test key
+  univention_config_registry:
+    keys:
+      ansible/foo:
+    state: absent
