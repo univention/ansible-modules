@@ -32,7 +32,7 @@
     name: "/etc/hosts"
     line: "192.168.1.1\tinvalid.intranet"
     state: "present"
-  check_mode: yes
+  check_mode: true
   register: "hosts"
   failed_when: "(hosts is changed) or (hosts is failed)"
 
