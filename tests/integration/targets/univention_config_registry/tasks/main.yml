@@ -4,6 +4,20 @@
       system/stats/cron: 1 2 3 4 5
       ansible/foo: bar
 
+- name: Get ansible/foo
+  ansible.builtin.command: univention-config-registry get ansible/foo
+  register: ansible_foo
+
+- name: Get stats cron
+  ansible.builtin.command: tail -2 /etc/cron.d/univention-system-stats
+  register: sys_cron
+
+- name: Check settings
+  ansible.builtin.assert:
+    that:
+      - "'bar' in ansible_foo.stdout"
+      - "'1 2 3 4 5' in sys_cron.stdout"
+
 - name: Set /etc/hosts entries
   univention_config_registry:
     kvlist:
@@ -11,8 +25,26 @@
         value: invalid.intranet
   loop: [ '192.168.0.1', '192.168.1.1' ]
 
+- name: "Check /etc/hosts content"
+  ansible.builtin.lineinfile:
+    name: /etc/hosts
+    line: "192.168.1.1\tinvalid.intranet"
+    state: present
+  check_mode: yes
+  register: conf
+  failed_when: (conf is changed) or (conf is failed)
+
 - name: Clear test key
   univention_config_registry:
     keys:
       ansible/foo:
     state: absent
+
+- name: Get ansible/foo
+  ansible.builtin.command: univention-config-registry get ansible/foo
+  register: ansible_foo
+
+- name: Check cleared key
+  ansible.builtin.assert:
+    that:
+      - "'bar' not in ansible_foo.stdout"
