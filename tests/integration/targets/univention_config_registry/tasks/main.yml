@@ -23,9 +23,11 @@
 - name: "Set /etc/hosts entries"
   univention_config_registry:
     kvlist:
-      - key: "hosts/static/{{ item }}"
+      - key: "hosts/static/{{ _hosts_item }}"
         value: "invalid.intranet"
   loop: [ "192.168.0.1", "192.168.1.1" ]
+  loop_control:
+    loop_var: "_hosts_item"
 
 - name: "Check /etc/hosts content"
   ansible.builtin.lineinfile:
