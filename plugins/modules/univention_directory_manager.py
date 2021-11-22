@@ -8,7 +8,7 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 ANSIBLE_METADATA = {
-    'metadata_version': '1.1',
+    'metadata_version': '1.2',
     'status': ['preview'],
     'supported_by': 'comunity'
 }
@@ -304,7 +304,15 @@ def run_module():
             for obj in udm_mod.search(params['filter']):
                 _modify_object(udm_mod, module, obj, stats)
         if not params['dn'] and not params['filter']:
-            _create_object(udm_mod, module, stats)
+            properties = {x['property']: x['value'] for x in params['set_properties']}
+            obj = None
+            obj_id = properties.get('uid') or properties.get('name')
+            if obj_id:
+                obj = udm_mod.get_by_id(obj_id)
+            if obj:
+                _modify_object(udm_mod, module, obj, stats)
+            else:
+                _create_object(udm_mod, module, stats)
     elif params['state'] == 'absent':
         _remove_objects(udm_mod, module, stats)
     result['meta']['changed_objects'] = stats.changed_objects
