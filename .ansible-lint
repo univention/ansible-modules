@@ -39,7 +39,8 @@ enable_list:
 #   - var-spacing
 
 # This makes the linter display but not fail for rules/tags listed below:
-warn_list: []
+warn_list:
+  - "no-tabs"
 
 # Offline mode disables installation of requirements.yml
 offline: false
