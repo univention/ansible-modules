@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import datetime
+from ansible.module_utils.basic import AnsibleModule
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -95,15 +97,14 @@ message:
     description: A human-readable information about which keys where changed
 '''
 
-import datetime
-from ansible.module_utils.basic import AnsibleModule
-
 try:
     from univention.config_registry.backend import ConfigRegistry
     from univention.config_registry import configHandlers
+
     have_config_registry = True
 except ImportError:
     have_config_registry = False
+
 
 def _commit_files(files, result, module):
     result['changed'] = len(files) > 0
@@ -130,13 +131,13 @@ def _commit_files(files, result, module):
 
     ucr_handlers.commit(ucr, files)
 
-    endd                                 = datetime.datetime.now()
-    result['start']                      = str(startd)
-    result['end']                        = str(endd)
-    result['delta']                      = str(endd - startd)
+    endd = datetime.datetime.now()
+    result['start'] = str(startd)
+    result['end'] = str(endd)
+    result['delta'] = str(endd - startd)
     result['meta']['commited_templates'] = files
-    result['message']                    = "These files were be commited: {}".format(" ".join(files))
-    result['failed']                     = 0
+    result['message'] = "These files were be commited: {}".format(" ".join(files))
+    result['failed'] = 0
 
     # FIXME: Currently the function cannot fail
     # if error != 0:
@@ -148,7 +149,7 @@ def _set_keys(keys, result, module):
     ucr.load()
 
     def needs_change(key):
-        if not key in ucr:
+        if key not in ucr:
             return True
         if isinstance(keys[key], bool):
             if keys[key] and not ucr.is_true(key):
@@ -173,30 +174,31 @@ def _set_keys(keys, result, module):
     if not result['changed']:
         return
 
-    args                           = ["/usr/sbin/univention-config-registry", "set"] + [ "{0}={1}".format(key, keys[key]) for key in to_set ]
-    startd                         = datetime.datetime.now()
+    args = ["/usr/sbin/univention-config-registry", "set"] + ["{0}={1}".format(key, keys[key]) for key in to_set]
+    startd = datetime.datetime.now()
 
-    rc, out, err                   = module.run_command(args)
+    rc, out, err = module.run_command(args)
 
-    endd                           = datetime.datetime.now()
-    result['start']                = str(startd)
-    result['end']                  = str(endd)
-    result['delta']                = str(endd - startd)
-    result['out']                  = out.rstrip("\r\n")
-    result['err']                  = err.rstrip("\r\n")
-    result['rc']                   = rc
-    result['message']              = "These keys were set: {}".format(" ".join(to_set))
+    endd = datetime.datetime.now()
+    result['start'] = str(startd)
+    result['end'] = str(endd)
+    result['delta'] = str(endd - startd)
+    result['out'] = out.rstrip("\r\n")
+    result['err'] = err.rstrip("\r\n")
+    result['rc'] = rc
+    result['message'] = "These keys were set: {}".format(" ".join(to_set))
     result['meta']['changed_keys'] = to_set
-    result['failed']               = rc != 0 or len(err) > 0
+    result['failed'] = rc != 0 or len(err) > 0
 
     if rc != 0:
         module.fail_json(msg='non-zero return code', **result)
+
 
 def _unset_keys(keys, result, module):
     ucr = ConfigRegistry()
     ucr.load()
 
-    to_unset          = [ key for key in keys if key in ucr ]
+    to_unset = [key for key in keys if key in ucr]
     result['changed'] = len(to_unset) > 0
 
     if not result['changed']:
@@ -210,24 +212,25 @@ def _unset_keys(keys, result, module):
     if not result['changed']:
         return
 
-    args                           = ["/usr/sbin/univention-config-registry", "unset"] + to_unset
-    startd                         = datetime.datetime.now()
+    args = ["/usr/sbin/univention-config-registry", "unset"] + to_unset
+    startd = datetime.datetime.now()
 
-    rc, out, err                   = module.run_command(args)
+    rc, out, err = module.run_command(args)
 
-    endd                           = datetime.datetime.now()
-    result['start']                = str(startd)
-    result['end']                  = str(endd)
-    result['delta']                = str(endd - startd)
-    result['out']                  = out.rstrip("\r\n")
-    result['err']                  = err.rstrip("\r\n")
-    result['rc']                   = rc
-    result['message']              = "These keys were unset: {}".format(" ".join(to_unset))
+    endd = datetime.datetime.now()
+    result['start'] = str(startd)
+    result['end'] = str(endd)
+    result['delta'] = str(endd - startd)
+    result['out'] = out.rstrip("\r\n")
+    result['err'] = err.rstrip("\r\n")
+    result['rc'] = rc
+    result['message'] = "These keys were unset: {}".format(" ".join(to_unset))
     result['meta']['changed_keys'] = to_unset
-    result['failed']               = rc != 0
+    result['failed'] = rc != 0
 
     if rc != 0:
         module.fail_json(msg='non-zero return code', **result)
+
 
 def run_module():
     # define available arguments/parameters a user can pass to the module
@@ -252,11 +255,13 @@ def run_module():
     if not have_config_registry:
         module.fail_json(msg='The Python "univention.config_registry.backend" is not available', **result)
 
-    if not (('keys' in module.params and module.params['keys']) or ('kvlist' in module.params and module.params['kvlist']) or ('commit' in module.params and module.params['commit'])):
+    if not (('keys' in module.params and module.params['keys'])
+            or ('kvlist' in module.params and module.params['kvlist'])
+            or ('commit' in module.params and module.params['commit'])):
         module.fail_json(msg='Either "keys", "kvlist" or "commit" is required.', **result)
 
-    state  = module.params['state']
-    keys   = module.params['keys'] if 'keys' in module.params and module.params['keys'] else dict()
+    state = module.params['state']
+    keys = module.params['keys'] if 'keys' in module.params and module.params['keys'] else dict()
     commit = module.params['commit'] if 'commit' in module.params and module.params['commit'] else list()
 
     if 'kvlist' in module.params and module.params['kvlist']:

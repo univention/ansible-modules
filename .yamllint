@@ -1,0 +1,30 @@
+---
+# reference: https://yamllint.readthedocs.io/
+
+extends: "default"
+
+ignore: |
+ .gitlab-ci.yml
+
+rules:
+  braces:
+    max-spaces-inside: 1
+    level: "error"
+
+  brackets:
+    max-spaces-inside: 1
+    level: "error"
+
+  line-length:
+    max: 120
+    level: "warning"
+
+  new-line-at-end-of-file:
+    level: "warning"
+
+  quoted-strings:
+    quote-type: "double"
+    required: true
+
+  truthy:
+    level: "error"
