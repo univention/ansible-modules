@@ -143,8 +143,6 @@ message:
     description: A human-readable information about which objects were changed.
 '''
 
-import datetime
-import pprint
 from ansible.module_utils.basic import AnsibleModule
 
 try:
