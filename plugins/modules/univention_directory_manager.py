@@ -143,35 +143,40 @@ message:
     description: A human-readable information about which objects were changed.
 '''
 
-from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.basic import AnsibleModule  # noqa F401
 
 try:
     from univention.udm import UDM
+
     have_udm = True
-except:
+except ModuleNotFoundError:
     have_udm = False
 
-class Stats():
+
+class Stats:
     changed_objects = []
 
-def _set_property(obj,prop,value):
-    setattr(obj.props,prop,value)
 
-def _create_or_modify_object(udm_mod,module,stats):
+def _set_property(obj, prop, value):
+    setattr(obj.props, prop, value)
+
+
+def _create_or_modify_object(udm_mod, module, stats):
     try:
         obj = udm_mod.get(module.params['dn'])
-    except:
+    except Exception:
         obj = None
     if obj:
-        _modify_object(udm_mod,module,obj,stats)
+        _modify_object(udm_mod, module, obj, stats)
     else:
-        _create_object(udm_mod,module,stats)
+        _create_object(udm_mod, module, stats)
 
-def _create_object(udm_mod,module,stats):
+
+def _create_object(udm_mod, module, stats):
     params = module.params
     obj = udm_mod.new()
     if module.params['dn']:
-        pass # read position and name from dn
+        pass  # read position and name from dn
     else:
         if params['position']:
             obj.position = params['position']
@@ -183,12 +188,13 @@ def _create_object(udm_mod,module,stats):
     for attr in params['set_properties']:
         prop_name = attr['property']
         prop_value = attr['value']
-        _set_property(obj,prop_name,prop_value)
+        _set_property(obj, prop_name, prop_value)
     if not module.check_mode:
         obj.save()
         stats.changed_objects.append(obj.dn)
 
-def _modify_object(udm_mod,module,obj,stats):
+
+def _modify_object(udm_mod, module, obj, stats):
     params = module.params
     # TODO add policies and options
     # if params['policies']:
@@ -198,30 +204,31 @@ def _modify_object(udm_mod,module,obj,stats):
     if params['unset_properties']:
         for attr in params['unset_properties']:
             prop_name = attr['property']
-            _set_property(obj,prop_name,None)
+            _set_property(obj, prop_name, None)
     if params['set_properties']:
         for attr in params['set_properties']:
             prop_name = attr['property']
             prop_value = attr['value']
-            _set_property(obj,prop_name,prop_value)
+            _set_property(obj, prop_name, prop_value)
     if not module.check_mode:
         obj.save()
         stats.changed_objects.append(obj.dn)
 
-def _remove_objects(udm_mod,module,stats):
+
+def _remove_objects(udm_mod, module, stats):
     params = module.params
     if module.check_mode:
         return
     if not params['dn'] and not params['filter']:
-        module.fail_json(msg='need dn or filter to delte an object', **result)
+        module.fail_json(msg='need dn or filter to delete an object', **result)  # noqa F821
     if params['dn']:
-        obj = udm_mod.get( params['dn'] )
+        obj = udm_mod.get(params['dn'])
         if not module.check_mode:
             obj.delete()
             stats.changed_objects.append(obj.dn)
     if params['filter']:
         for baseobject in udm_mod.search(params['filter']):
-            obj = udm_mod.get( baseobject.dn )
+            obj = udm_mod.get(baseobject.dn)
             if not module.check_mode:
                 obj.delete()
                 stats.changed_objects.append(obj.dn)
@@ -229,43 +236,43 @@ def _remove_objects(udm_mod,module,stats):
 
 def run_module():
     module_args = dict(
-        module = dict(
-            type = 'str',
-            required = True
+        module=dict(
+            type='str',
+            required=True
         ),
-        position = dict(
-            type = 'str',
-            required = False
-        ),
-        set_properties = dict(
-            type = 'list',
-            required = False
-        ),
-        unset_properties = dict(
-            type = 'list',
-            required = False
-        ),
-        dn = dict(
+        position=dict(
             type='str',
             required=False
         ),
-        filter = dict(
+        set_properties=dict(
+            type='list',
+            required=False
+        ),
+        unset_properties=dict(
+            type='list',
+            required=False
+        ),
+        dn=dict(
             type='str',
             required=False
         ),
-        state = dict(
+        filter=dict(
+            type='str',
+            required=False
+        ),
+        state=dict(
             type='str',
             default='present',
-            coices=['present','absent'],
+            coices=['present', 'absent'],
             required=False
         ),
-        options = dict(
-            type = 'list',
-            required = False
+        options=dict(
+            type='list',
+            required=False
         ),
-        policies = dict(
-            type = 'list',
-            required = False
+        policies=dict(
+            type='list',
+            required=False
         ),
     )
 
@@ -284,25 +291,26 @@ def run_module():
         module.fail_json(msg='The Python "univention.udm" is not available', **result)
 
     params = module.params
-    udm_con = UDM.admin() # connection to UDM
+    udm_con = UDM.admin()  # connection to UDM
     udm_con.version(1)
     udm_mod = udm_con.get(module.params['module'])
     stats = Stats()
 
     if params['state'] == 'present':
         if params['dn']:
-            _create_or_modify_object(udm_mod,module,stats)
+            _create_or_modify_object(udm_mod, module, stats)
         if params['filter']:
             for obj in udm_mod.search(params['filter']):
-                _modify_object(udm_mod,module,obj,stats)
+                _modify_object(udm_mod, module, obj, stats)
         if not params['dn'] and not params['filter']:
-            _create_object(udm_mod,module,stats)
+            _create_object(udm_mod, module, stats)
     elif params['state'] == 'absent':
-        _remove_objects(udm_mod,module,stats)
+        _remove_objects(udm_mod, module, stats)
     result['meta']['changed_objects'] = stats.changed_objects
     result['meta']['message'] = 'changed objects: %s' " ".join(stats.changed_objects)
 
     module.exit_json(**result)
+
 
 if __name__ == '__main__':
     run_module()
