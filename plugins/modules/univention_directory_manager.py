@@ -73,7 +73,6 @@ EXAMPLES = '''
 - name: create a user
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'present'
     set_properties:
       - property: 'username'
@@ -87,7 +86,6 @@ EXAMPLES = '''
 - name: delete a user with a search filter
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'absent'
     filter: '(uid=testuser1)'
 
@@ -95,7 +93,6 @@ EXAMPLES = '''
 - name: create a user with position
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'present'
     position: 'cn=users,ou=DEMOSCHOOL,dc=t1,dc=intranet'
     set_properties:
@@ -110,7 +107,6 @@ EXAMPLES = '''
 - name: delete the user with position
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'absent'
     dn: 'uid=testuser2,cn=users,ou=DEMOSCHOOL,dc=t1,dc=intranet'
 
@@ -118,7 +114,6 @@ EXAMPLES = '''
 - name: modify testuser3 - add or change a property
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'present'
     filter: '(uid=testuser3)'
     set_properties:
@@ -129,7 +124,6 @@ EXAMPLES = '''
 - name: modify testuser3 - remove property
   univention_directory_manager:
     module: 'users/user'
-    action: 'modify'
     state: 'present'
     filter: '(uid=testuser3)'
     unset_properties:
