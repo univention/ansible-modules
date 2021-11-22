@@ -25,7 +25,7 @@ description:
 options:
     module:
         description:
-            - The udm module for witch objects are to be modified
+            - The udm module for which objects are to be modified
         type: str
         required: True
     position:
@@ -41,6 +41,7 @@ options:
     filter:
         description:
             - A LDAP search filter to select objects.
+        type: str
         required: false
     state:
         description:
