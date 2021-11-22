@@ -2,7 +2,7 @@ FROM univention/univention-corporate-server
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
-		apt install -y locales python-pip python3-cairo-dev python3-pip python3-cairo-dev && \
+		apt install -y locales python-pip python-cairo-dev python3-pip python3-cairo-dev && \
 		apt autoremove -y && \
 		rm -rf /var/lib/apt/lists/*
 
