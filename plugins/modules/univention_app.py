@@ -101,9 +101,12 @@ def ansible_exec(action, appname=None, keyfile=None, username=None):
     univention_app_cmd = {
         'list': "univention-app list --ids-only",
         'info': "univention-app info --as-json",
-        'install': "univention-app {} --noninteractive --username {} --pwdfile {} {}".format(action, username, keyfile, appname),
-        'remove': "univention-app {} --noninteractive --username {} --pwdfile {} {}".format(action, username, keyfile, appname),
-        'upgrade': "univention-app {} --noninteractive --username {} --pwdfile {} {}".format(action, username, keyfile, appname),
+        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
+                    .format(action, username, keyfile, appname)),
+        'remove': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
+                   .format(action, username, keyfile, appname)),
+        'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
+                    .format(action, username, keyfile, appname)),
         'stall': "univention-app {} {}".format(action, appname),
         'undo_stall': "univention-app {} {} --undo".format(action, appname),
     }
@@ -174,12 +177,14 @@ def upgrade_app(_appname, _authfile):
 
 
 def stall_app(_appname, _authfile):
-    ''' stalls an app with given name and path to auth-file, uses ansible_exec() and return tuple of exit-code and stdout. '''
+    ''' stalls an app with given name and path to auth-file, uses ansible_exec()
+        and return tuple of exit-code and stdout. '''
     return ansible_exec(action='stall', appname=_appname, keyfile=_authfile)
 
 
 def undo_stall_app(_appname, _authfile):
-    ''' undos the stalling of an app with given name and path to auth-file, uses ansible_exec() and return tuple of exit-code and stdout. '''
+    ''' undos the stalling of an app with given name and path to auth-file, uses ansible_exec()
+        and return tuple of exit-code and stdout. '''
     return ansible_exec(action='undo_stall', appname=_appname, keyfile=_authfile)
 
 
@@ -246,13 +251,14 @@ def main():
 
     # some basic logic-checks
     if not app_absent and not app_present:  # this means the app does not exist
-        module.fail_json(msg="app {} does not exist. Please choose from following options:\n{}".format(app_name, str(available_apps_list)))
+        module.fail_json(msg=("app {} does not exist. Please choose from following options:\n{}"
+                              .format(app_name, str(available_apps_list))))
     if app_absent and app_present:  # schroedinger's app-status
         module.fail_json(msg="an error occured while getting the status of {}".format(app_name))
 
     # upgrade, install or remove the app, or just do nothing at all and exit
     if app_status_target == 'present' and app_upgradeable and app_status_upgrade:
-        #upgrade_app(app_name)
+        # upgrade_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _upgrade_app = upgrade_app(app_name, auth_file)
@@ -267,7 +273,7 @@ def main():
         module.exit_json(changed=False, msg="App {} already installed. No change.".format(app_name))
 
     elif app_status_target == 'present' and not app_present:
-        #install_app(app_name)
+        # install_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _install_app = install_app(app_name, auth_file)
@@ -279,7 +285,7 @@ def main():
             os.remove(auth_file)
 
     elif app_status_target == 'absent' and app_present:
-        #remove_app(app_name)
+        # remove_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _remove_app = remove_app(app_name, auth_file)
@@ -294,7 +300,7 @@ def main():
         module.exit_json(changed=False, msg="App {} not installed. No change.".format(app_name))
 
     if app_present and app_stall_target == 'yes':
-        #stall_app(app_name)
+        # stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _stall_app = stall_app(app_name, auth_file)
@@ -305,7 +311,7 @@ def main():
         finally:
             os.remove(auth_file)
     elif app_present and app_stall_target == 'no':
-        #undo_stall_app(app_name)
+        # undo_stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _undo_stall_app = undo_stall_app(app_name, auth_file)
