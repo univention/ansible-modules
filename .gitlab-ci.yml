@@ -57,8 +57,7 @@ integration-tests:
     - chmod 0600 "$SSH_PRIVATE_KEY_BUILD"
     - mv "$SSH_PRIVATE_KEY_BUILD"  ~/.ssh/id_rsa
   script:
-    - env
-    - ucs-kvm-create -c ucs-kvm-create.cfg
+    - ucs-kvm-create -t -c ucs-kvm-create.cfg
     - test -e COMMAND_SUCCESS
   artifacts:
     paths:

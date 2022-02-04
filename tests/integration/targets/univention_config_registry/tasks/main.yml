@@ -1,59 +1,54 @@
 ---
 
+- name: "Set keys"
+  univention_config_registry:
+    keys:
+      system/stats/cron: "1 2 3 4 5"
+      ansible/foo: "bar"
 
-- name: "ucr tests"
-  hosts: localhost
-  tasks:
+- name: "Get ansible/foo"
+  ansible.builtin.command: "univention-config-registry get ansible/foo"
+  register: "ansible_foo"
 
-    - name: "Set keys"
-      univention_config_registry:
-        keys:
-          system/stats/cron: "1 2 3 4 5"
-          ansible/foo: "bar"
+- name: "Get stats cron"
+  ansible.builtin.command: "tail -2 /etc/cron.d/univention-system-stats"
+  register: "sys_cron"
 
-    - name: "Get ansible/foo"
-      command: "univention-config-registry get ansible/foo"
-      register: "ansible_foo"
+- name: "Check settings"
+  ansible.builtin.assert:
+    that:
+      - "'bar' in ansible_foo.stdout"
+      - "'1 2 3 4 5' in sys_cron.stdout"
 
-    - name: "Get stats cron"
-      command: "tail -2 /etc/cron.d/univention-system-stats"
-      register: "sys_cron"
+- name: "Set /etc/hosts entries"
+  univention_config_registry:
+    kvlist:
+      - key: "hosts/static/{{ _hosts_item }}"
+        value: "invalid.intranet"
+  loop: [ "192.168.0.1", "192.168.1.1" ]
+  loop_control:
+    loop_var: "_hosts_item"
 
-    - name: "Check settings"
-      assert:
-        that:
-          - "'bar' in ansible_foo.stdout"
-          - "'1 2 3 4 5' in sys_cron.stdout"
+- name: "Check /etc/hosts content"
+  ansible.builtin.lineinfile:
+    name: "/etc/hosts"
+    line: "192.168.1.1\tinvalid.intranet"
+    state: "present"
+  check_mode: true
+  register: "hosts"
+  failed_when: "(hosts is changed) or (hosts is failed)"
 
-    - name: "Set /etc/hosts entries"
-      univention_config_registry:
-        kvlist:
-          - key: "hosts/static/{{ _hosts_item }}"
-            value: "invalid.intranet"
-      loop: [ "192.168.0.1", "192.168.1.1" ]
-      loop_control:
-        loop_var: "_hosts_item"
+- name: "Clear test key"
+  univention_config_registry:
+    keys:
+      ansible/foo:
+    state: "absent"
 
-    - name: "Check /etc/hosts content"
-      lineinfile:
-        name: "/etc/hosts"
-        line: "192.168.1.1\tinvalid.intranet"
-        state: "present"
-      check_mode: true
-      register: "hosts"
-      failed_when: "(hosts is changed) or (hosts is failed)"
+- name: "Get ansible/foo"
+  ansible.builtin.command: "univention-config-registry get ansible/foo"
+  register: "ansible_foo"
 
-    - name: "Clear test key"
-      univention_config_registry:
-        keys:
-          ansible/foo:
-        state: "absent"
-
-    - name: "Get ansible/foo"
-      command: "univention-config-registry get ansible/foo"
-      register: "ansible_foo"
-
-    - name: "Check cleared key"
-      assert:
-        that:
-          - "'bar' not in ansible_foo.stdout"
+- name: "Check cleared key"
+  ansible.builtin.assert:
+    that:
+      - "'bar' not in ansible_foo.stdout"
