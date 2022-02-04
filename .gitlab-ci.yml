@@ -1,8 +1,19 @@
 stages:
   - .pre
+  - tests
   - prepare
   - release
   - publish
+
+variables:
+  LANG: "C.UTF-8"
+  DEBIAN_FRONTEND: noninteractive
+  CI_REGISTRY: docker-registry.knut.univention.de
+  IMAGE_UCS_EC2_TOOLS: $CI_REGISTRY/ucs-ec2-tools
+  KVM_USER: build
+  KVM_BUILD_SERVER: ranarp
+  KVM_TEMPLATE: ucs-joined-master
+  UCS_VERSION: 5.0-1
 
 .publish-common:
   artifacts:
@@ -37,6 +48,23 @@ stages:
   variables:
     GIT_STRATEGY: clone
     NODE_EXTRA_CA_CERTS: "/usr/local/share/ca-certificates/ucs-root-ca.crt"
+
+integration-tests:
+  stage: tests
+  image: $IMAGE_UCS_EC2_TOOLS
+  before_script:
+    - mkdir ~/.ssh/
+    - chmod 0600 "$SSH_PRIVATE_KEY_BUILD"
+    - mv "$SSH_PRIVATE_KEY_BUILD"  ~/.ssh/id_rsa
+  script:
+    - env
+    - ucs-kvm-create -c ucs-kvm-create.cfg
+    - test -e COMMAND_SUCCESS
+  artifacts:
+    paths:
+      - ucs-kvm-create.log
+    expire_in: 3 days
+  when: manual
 
 prepare:
   artifacts:

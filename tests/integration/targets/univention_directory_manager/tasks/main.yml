@@ -1,71 +1,75 @@
 ---
 
-- name: "Gather custom facts"
-  ansible.builtin.command: "univention-config-registry get ldap/base"
-  register: "base_dn"
-  changed_when: "base_dn.stdout is search('dn=')"
+- name: "ucr tests"
+  hosts: localhost
+  tasks:
 
-- name: "create a user"
-  univention_directory_manager:
-    module: "users/user"
-    state: "present"
-    set_properties:
-      - property: "username"
-        value: "testuser1"
-      - property: "lastname"
-        value: "testuser1"
-      - property: "password"
-        value: "univention"
+  - name: "Gather custom facts"
+    command: "univention-config-registry get ldap/base"
+    register: "base_dn"
+    changed_when: "base_dn.stdout is search('dn=')"
 
-- name: "modify testuser1 - add or change a property"
-  univention_directory_manager:
-    module: "users/user"
-    state: "present"
-    filter: "(uid=testuser1)"
-    set_properties:
-      - property: "firstname"
-        value: "max"
+  - name: "create a user"
+    univention_directory_manager:
+      module: "users/user"
+      state: "present"
+      set_properties:
+        - property: "username"
+          value: "testuser1"
+        - property: "lastname"
+          value: "testuser1"
+        - property: "password"
+          value: "univention"
 
-- name: "modify testuser1 - remove property"
-  univention_directory_manager:
-    module: "users/user"
-    state: "present"
-    filter: "(uid=testuser1)"
-    unset_properties:
-      - property: "firstname"
-        value: "does not matter"
+  - name: "modify testuser1 - add or change a property"
+    univention_directory_manager:
+      module: "users/user"
+      state: "present"
+      filter: "(uid=testuser1)"
+      set_properties:
+        - property: "firstname"
+          value: "max"
 
-- name: "delete a user with a search filter"
-  univention_directory_manager:
-    module: "users/user"
-    state: "absent"
-    filter: "(uid=testuser1)"
+  - name: "modify testuser1 - remove property"
+    univention_directory_manager:
+      module: "users/user"
+      state: "present"
+      filter: "(uid=testuser1)"
+      unset_properties:
+        - property: "firstname"
+          value: "does not matter"
 
-- name: "create a custom OU"
-  univention_directory_manager:
-    module: "container/ou"
-    state: "present"
-    set_properties:
-      - property: "name"
-        value: "temp"
-      - property: "userPath"
-        value: "1"
+  - name: "delete a user with a search filter"
+    univention_directory_manager:
+      module: "users/user"
+      state: "absent"
+      filter: "(uid=testuser1)"
 
-- name: "create a user with position"
-  univention_directory_manager:
-    module: "users/user"
-    state: "present"
-    position: "ou=temp,{{ base_dn.stdout }}"
-    set_properties:
-      - property: "username"
-        value: "testuser2"
-      - property: "lastname"
-        value: "testuser2"
-      - property: "password"
-        value: "univention"
+  - name: "create a custom OU"
+    univention_directory_manager:
+      module: "container/ou"
+      state: "present"
+      set_properties:
+        - property: "name"
+          value: "temp"
+        - property: "userPath"
+          value: "1"
 
-- name: "delete the user with position"
-  univention_directory_manager:
-    module: "users/user"
-    state: "absent"
-    dn: "uid=testuser2,ou=temp,{{ base_dn.stdout }}"
+  - name: "create a user with position"
+    univention_directory_manager:
+      module: "users/user"
+      state: "present"
+      position: "ou=temp,{{ base_dn.stdout }}"
+      set_properties:
+        - property: "username"
+          value: "testuser2"
+        - property: "lastname"
+          value: "testuser2"
+        - property: "password"
+          value: "univention"
+
+  - name: "delete the user with position"
+    univention_directory_manager:
+      module: "users/user"
+      state: "absent"
+      dn: "uid=testuser2,ou=temp,{{ base_dn.stdout }}"
