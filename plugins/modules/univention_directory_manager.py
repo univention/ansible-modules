@@ -167,24 +167,49 @@ def _create_or_modify_object(udm_mod, module, stats):
     else:
         _create_object(udm_mod, module, stats)
 
+def apply_policies(obj, module):
+    params = module.params
+    if params['policies']:
+        obj.policies = params['policies']
+    # return obj
+
+def apply_options(obj, module):
+    params = module.params
+    if params['options']:
+        obj.options = []
+        for opt in params['options']:
+           obj.options.append(opt)
+    # return obj
+
+def _set_name_property(obj, udm_mod, name):
+	if udm_mod == 'users/user':
+		_set_property(obj, 'username', name)
+	elif udm_mod == 'saml/serviceprovider':
+		_set_property(obj, 'Identifier', name)
+	elif udm_mod == 'saml/idpconfig':
+		_set_property(obj, 'id', name)
+	elif udm_mod == 'uvmm/info':
+		_set_property(obj, 'uuid', name)
+	else:
+		_set_property(obj, 'name', name)
 
 def _create_object(udm_mod, module, stats):
     params = module.params
     obj = udm_mod.new()
     if module.params['dn']:
-        pass  # read position and name from dn
+        name, position = module.params['dn'].split(',',1)
+        obj.position = position
+        _set_name_property(obj, udm_mod, name)
     else:
         if params['position']:
             obj.position = params['position']
-    # TODO add policies and options
-    # if params['policies']:
-    # 	obj.policies = params['policies']
-    # if params['options']:
-    # 	obj.options.append(params['options'])
-    for attr in params['set_properties']:
-        prop_name = attr['property']
-        prop_value = attr['value']
-        _set_property(obj, prop_name, prop_value)
+    apply_options(obj, module)
+    apply_policies(obj, module)
+    if params['set_properties']:
+        for attr in params['set_properties']:
+            prop_name = attr['property']
+            prop_value = attr['value']
+            _set_property(obj, prop_name, prop_value)
     if not module.check_mode:
         obj.save()
         stats.changed_objects.append(obj.dn)
@@ -192,11 +217,8 @@ def _create_object(udm_mod, module, stats):
 
 def _modify_object(udm_mod, module, obj, stats):
     params = module.params
-    # TODO add policies and options
-    # if params['policies']:
-    # 	obj.policies = params['policies']
-    # if params['options']:
-    # 	obj.options.append(params['options'])
+    apply_options(obj, module)
+    apply_policies(obj, module)
     if params['unset_properties']:
         for attr in params['unset_properties']:
             prop_name = attr['property']
@@ -215,8 +237,6 @@ def _remove_objects(udm_mod, module, stats):
     params = module.params
     if module.check_mode:
         return
-    if not params['dn'] and not params['filter']:
-        module.fail_json(msg='need dn or filter to delete an object', **result)  # noqa F821
     if params['dn']:
         obj = udm_mod.get(params['dn'])
         if not module.check_mode:
@@ -295,15 +315,18 @@ def run_module():
     if params['state'] == 'present':
         if params['dn']:
             _create_or_modify_object(udm_mod, module, stats)
-        if params['filter']:
+        elif params['filter']:
             for obj in udm_mod.search(params['filter']):
                 _modify_object(udm_mod, module, obj, stats)
-        if not params['dn'] and not params['filter']:
+        elif not params['dn'] and not params['filter']:
             properties = {x['property']: x['value'] for x in params['set_properties']}
             obj = None
-            obj_id = properties.get('uid') or properties.get('name')
+            obj_id = properties.get('uid') or properties.get('name') or properties.get('username')
             if obj_id:
-                obj = udm_mod.get_by_id(obj_id)
+                try:
+                    obj = udm_mod.get_by_id(obj_id)
+                except:
+                    obj = None
             if obj:
                 _modify_object(udm_mod, module, obj, stats)
             else:
