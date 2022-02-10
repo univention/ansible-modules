@@ -13,6 +13,7 @@ variables:
   KVM_USER: build
   KVM_BUILD_SERVER: ranarp
   KVM_TEMPLATE: ucs-joined-master
+  KVM_DHCP: 0
   UCS_VERSION: 5.0-1
 
 .publish-common:
