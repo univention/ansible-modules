@@ -11,9 +11,9 @@ variables:
   CI_REGISTRY: docker-registry.knut.univention.de
   IMAGE_UCS_EC2_TOOLS: $CI_REGISTRY/ucs-ec2-tools
   KVM_USER: build
-  KVM_BUILD_SERVER: ranarp
+  KVM_BUILD_SERVER: ranarp.knut.univention.de
   KVM_TEMPLATE: ucs-joined-master
-  KVM_DHCP: 0
+  KVM_DHCP: "0"
   UCS_VERSION: 5.0-1
 
 .publish-common:

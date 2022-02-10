@@ -27,6 +27,7 @@ cmd+=(
     -v "$CFG:$CFG:ro"
     --dns '192.168.0.124'
     --dns '192.168.0.97'
+    --network host
     --dns-search 'knut.univention.de'
     -v "$HOME/.ssh:$HOME/.ssh:ro"
     -e UCS_VERSION="$UCS_VERSION"
