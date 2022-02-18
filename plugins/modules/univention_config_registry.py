@@ -133,11 +133,11 @@ def _commit_files(files, result, module):
     result['changed'] = len(files) > 0
 
     if not result['changed']:
-        result['message'] = "No files need to be unset"
+        result['message'] = "No files need to be committed"
 
     if module.check_mode:
         if len(files) > 0:
-            result['message'] = "These files will be commited: {}".format(" ".join(files))
+            result['message'] = "These files will be committed: {}".format(" ".join(files))
         return
 
     if not result['changed']:
@@ -156,7 +156,7 @@ def _commit_files(files, result, module):
     result['err'] = err.rstrip("\r\n")
     result['rc'] = rc
     result['meta']['commited_templates'] = files
-    result['message'] = "These files were be commited: {}".format(" ".join(files))
+    result['message'] = "These files were committed: {}".format(" ".join(files))
     result['failed'] = rc != 0 or len(err) > 0
 
     if rc != 0:
