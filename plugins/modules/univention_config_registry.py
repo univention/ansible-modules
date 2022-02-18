@@ -97,14 +97,37 @@ message:
     description: A human-readable information about which keys where changed
 '''
 
-try:
-    from univention.config_registry.backend import ConfigRegistry
-    from univention.config_registry import configHandlers
+import datetime
+from ansible.module_utils.basic import AnsibleModule
 
-    have_config_registry = True
-except ImportError:
-    have_config_registry = False
+TRUE = frozenset({'yes', 'true', '1', 'enable', 'enabled', 'on'})
+FALSE = frozenset({'no', 'false', '0', 'disable', 'disabled', 'off'})
 
+def _load_one_file(file_name, ucr):
+    try:
+        with open("/etc/univention/{}".format(file_name)) as file:
+            for line in file:
+                parts = line.rstrip("\r\n").split(':', 1)
+                if len(parts) < 2:
+                    continue
+
+                ucr[parts[0]] = '' if (len(parts[1]) == 0) or (parts[1][0] != ' ') else parts[1][1:]
+
+    except FileNotFoundError:
+        pass
+
+def _load_config_registry(result, module):
+    ucr = {}
+
+    # Load in reverse priority order & simply overwrite entries
+    # retrieved from earlier files with ones from later files.
+    for file_name in [ 'base-defaults.conf', 'base.conf', 'base-ldap.conf', 'base-schedule.conf', 'base-forced.conf' ]:
+        _load_one_file(file_name, ucr)
+
+    if not ucr:
+        module.fail_json(msg='This system does not seem to be a UCS system, or the config registry does not exist yet', **result)
+
+    return ucr
 
 def _commit_files(files, result, module):
     result['changed'] = len(files) > 0
@@ -120,41 +143,49 @@ def _commit_files(files, result, module):
     if not result['changed']:
         return
 
+    args = ["/usr/sbin/univention-config-registry", "commit"] + files
     startd = datetime.datetime.now()
 
-    ucr = ConfigRegistry()
-    ucr.load()
-
-    ucr_handlers = configHandlers()
-    ucr_handlers.load()
-    ucr_handlers.update()
-
-    ucr_handlers.commit(ucr, files)
+    rc, out, err = module.run_command(args)
 
     endd = datetime.datetime.now()
     result['start'] = str(startd)
     result['end'] = str(endd)
     result['delta'] = str(endd - startd)
+    result['out'] = out.rstrip("\r\n")
+    result['err'] = err.rstrip("\r\n")
+    result['rc'] = rc
     result['meta']['commited_templates'] = files
     result['message'] = "These files were be commited: {}".format(" ".join(files))
-    result['failed'] = 0
+    result['failed'] = rc != 0 or len(err) > 0
 
-    # FIXME: Currently the function cannot fail
-    # if error != 0:
-    #     module.fail_json(msg='non-zero return code', **result)
-
+    if rc != 0:
+        module.fail_json(msg='non-zero return code', **result)
 
 def _set_keys(keys, result, module):
-    ucr = ConfigRegistry()
-    ucr.load()
+    ucr = _load_config_registry(result, module)
+
+    def is_true(key):
+        if not key in ucr:
+            return False
+        if ucr[key] is None:
+            return False
+        return ucr[key].lower() in TRUE
+
+    def is_false(key):
+        if not key in ucr:
+            return False
+        if ucr[key] is None:
+            return False
+        return ucr[key].lower() in FALSE
 
     def needs_change(key):
         if key not in ucr:
             return True
         if isinstance(keys[key], bool):
-            if keys[key] and not ucr.is_true(key):
+            if keys[key] and not is_true(key):
                 return True
-            elif not keys[key] and not ucr.is_false(key):
+            elif not keys[key] and not is_false(key):
                 return True
         elif ucr[key] != keys[key]:
             return True
@@ -195,9 +226,7 @@ def _set_keys(keys, result, module):
 
 
 def _unset_keys(keys, result, module):
-    ucr = ConfigRegistry()
-    ucr.load()
-
+    ucr = _load_config_registry(result, module)
     to_unset = [key for key in keys if key in ucr]
     result['changed'] = len(to_unset) > 0
 
@@ -251,9 +280,6 @@ def run_module():
         meta=dict(changed_keys=[], commited_templates=[]),
         message=''
     )
-
-    if not have_config_registry:
-        module.fail_json(msg='The Python "univention.config_registry.backend" is not available', **result)
 
     if not (('keys' in module.params and module.params['keys'])
             or ('kvlist' in module.params and module.params['kvlist'])
