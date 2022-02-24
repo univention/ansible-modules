@@ -81,7 +81,7 @@ EXAMPLES = '''
       - property: 'lastname'
         value: 'testuser1'
       - property: 'password'
-        value: 'univention'
+        value: 'mypassword'
 
 # delete one or more objects
 - name: delete a user with a search filter
@@ -102,7 +102,7 @@ EXAMPLES = '''
       - property: 'lastname'
         value: 'testuser2'
       - property: 'password'
-        value: 'univention'
+        value: 'mypassword'
 
 # delete on very specific object
 - name: delete the user with position
@@ -157,9 +157,9 @@ def _set_property(obj, prop, value):
     setattr(obj.props, prop, value)
 
 
-def _create_or_modify_object(udm_mod, module, stats):
+def _create_or_modify_object(dn, udm_mod, module, stats):
     try:
-        obj = udm_mod.get(module.params['dn'])
+        obj = udm_mod.get(dn)
     except Exception:
         obj = None
     if obj:
@@ -171,7 +171,6 @@ def apply_policies(obj, module):
     params = module.params
     if params['policies']:
         obj.policies = params['policies']
-    # return obj
 
 def apply_options(obj, module):
     params = module.params
@@ -179,30 +178,12 @@ def apply_options(obj, module):
         obj.options = []
         for opt in params['options']:
            obj.options.append(opt)
-    # return obj
-
-def _set_name_property(obj, udm_mod, name):
-	if udm_mod == 'users/user':
-		_set_property(obj, 'username', name)
-	elif udm_mod == 'saml/serviceprovider':
-		_set_property(obj, 'Identifier', name)
-	elif udm_mod == 'saml/idpconfig':
-		_set_property(obj, 'id', name)
-	elif udm_mod == 'uvmm/info':
-		_set_property(obj, 'uuid', name)
-	else:
-		_set_property(obj, 'name', name)
 
 def _create_object(udm_mod, module, stats):
     params = module.params
     obj = udm_mod.new()
-    if module.params['dn']:
-        name, position = module.params['dn'].split(',',1)
-        obj.position = position
-        _set_name_property(obj, udm_mod, name)
-    else:
-        if params['position']:
-            obj.position = params['position']
+    if params['position']:
+        obj.position = params['position']
     apply_options(obj, module)
     apply_policies(obj, module)
     if params['set_properties']:
@@ -213,7 +194,6 @@ def _create_object(udm_mod, module, stats):
     if not module.check_mode:
         obj.save()
         stats.changed_objects.append(obj.dn)
-
 
 def _modify_object(udm_mod, module, obj, stats):
     params = module.params
@@ -249,6 +229,37 @@ def _remove_objects(udm_mod, module, stats):
                 obj.delete()
                 stats.changed_objects.append(obj.dn)
 
+def _get_object_by_property(udm_mod, module):
+    try:
+        for prop in module.params['set_properties']:
+            if prop['property'] == udm_mod.meta.identifying_property:
+                return udm_mod.get_by_id(prop['value'])
+        else:
+            return None
+    except:
+        return None
+
+def _get_object_by_dn(udm_mod, module):
+    try:
+        if module.params['dn']:
+            return udm_mod.get(module.params['dn'])
+    except:
+        pass
+    return None
+
+def _extract_properties_from_dn(udm_mod, module, result):
+    if not module.params['dn']:
+        return
+    try:
+        name, position = module.params['dn'].split(',',1)
+        name = name.split('=',1)[1]
+        if not module.params['set_properties']:
+            module.params['set_properties'] = []
+        module.params['set_properties'].append({'property': udm_mod.meta.identifying_property,'value': name})
+        module.params['position'] = position
+    except IndexError as e:
+        result['meta']['message'] = 'Invalid parameter dn'
+        module.exit_json(**result)
 
 def run_module():
     module_args = dict(
@@ -306,33 +317,33 @@ def run_module():
     if not have_udm:
         module.fail_json(msg='The Python "univention.udm" is not available', **result)
 
-    params = module.params
     udm_con = UDM.admin()  # connection to UDM
     udm_con.version(1)
     udm_mod = udm_con.get(module.params['module'])
     stats = Stats()
 
+    _extract_properties_from_dn(udm_mod, module, result)
+    params = module.params
+
+    obj_by_filter = []
+    if params['filter']:
+        for obj in udm_mod.search(params['filter']):
+            obj_by_filter.append(obj)
+
+    obj_by_property = []
+    obj = _get_object_by_property(udm_mod, module)
+    if obj:
+        obj_by_property.append(obj)
+
     if params['state'] == 'present':
-        if params['dn']:
-            _create_or_modify_object(udm_mod, module, stats)
-        elif params['filter']:
-            for obj in udm_mod.search(params['filter']):
-                _modify_object(udm_mod, module, obj, stats)
-        elif not params['dn'] and not params['filter']:
-            properties = {x['property']: x['value'] for x in params['set_properties']}
-            obj = None
-            obj_id = properties.get('uid') or properties.get('name') or properties.get('username')
-            if obj_id:
-                try:
-                    obj = udm_mod.get_by_id(obj_id)
-                except:
-                    obj = None
-            if obj:
-                _modify_object(udm_mod, module, obj, stats)
-            else:
-                _create_object(udm_mod, module, stats)
+        for obj in obj_by_filter + obj_by_property:
+            _modify_object(udm_mod, module, obj, stats)
+        if len(obj_by_filter) == 0 and len(obj_by_property) == 0:
+            _create_object(udm_mod, module, stats)
+
     elif params['state'] == 'absent':
-        _remove_objects(udm_mod, module, stats)
+        for obj in obj_by_filter + obj_by_property:
+            _remove_objects(udm_mod, module, stats)
     result['meta']['changed_objects'] = stats.changed_objects
     result['meta']['message'] = 'changed objects: %s' " ".join(stats.changed_objects)
 
