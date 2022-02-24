@@ -143,6 +143,7 @@ from ansible.module_utils.basic import AnsibleModule  # noqa F401
 
 try:
     from univention.udm import UDM
+    import univention.udm
 
     have_udm = True
 except ModuleNotFoundError:
@@ -167,17 +168,20 @@ def _create_or_modify_object(dn, udm_mod, module, stats):
     else:
         _create_object(udm_mod, module, stats)
 
+
 def apply_policies(obj, module):
     params = module.params
     if params['policies']:
         obj.policies = params['policies']
+
 
 def apply_options(obj, module):
     params = module.params
     if params['options']:
         obj.options = []
         for opt in params['options']:
-           obj.options.append(opt)
+            obj.options.append(opt)
+
 
 def _create_object(udm_mod, module, stats):
     params = module.params
@@ -194,6 +198,7 @@ def _create_object(udm_mod, module, stats):
     if not module.check_mode:
         obj.save()
         stats.changed_objects.append(obj.dn)
+
 
 def _modify_object(udm_mod, module, obj, stats):
     params = module.params
@@ -229,6 +234,7 @@ def _remove_objects(udm_mod, module, stats):
                 obj.delete()
                 stats.changed_objects.append(obj.dn)
 
+
 def _get_object_by_property(udm_mod, module):
     try:
         for prop in module.params['set_properties']:
@@ -236,30 +242,39 @@ def _get_object_by_property(udm_mod, module):
                 return udm_mod.get_by_id(prop['value'])
         else:
             return None
-    except:
+    except univention.udm.exceptions.NoObject:
         return None
+    except univention.udm.exceptions.MultipleObjects:
+        return None
+    except TypeError:
+        return None
+
 
 def _get_object_by_dn(udm_mod, module):
     try:
         if module.params['dn']:
             return udm_mod.get(module.params['dn'])
-    except:
+    except univention.udm.exceptions.NoObject:
+        pass
+    except univention.udm.exceptions.MultipleObjects:
         pass
     return None
+
 
 def _extract_properties_from_dn(udm_mod, module, result):
     if not module.params['dn']:
         return
     try:
-        name, position = module.params['dn'].split(',',1)
-        name = name.split('=',1)[1]
+        name, position = module.params['dn'].split(',', 1)
+        name = name.split('=', 1)[1]
         if not module.params['set_properties']:
             module.params['set_properties'] = []
-        module.params['set_properties'].append({'property': udm_mod.meta.identifying_property,'value': name})
+        module.params['set_properties'].append({'property': udm_mod.meta.identifying_property, 'value': name})
         module.params['position'] = position
-    except IndexError as e:
+    except IndexError:
         result['meta']['message'] = 'Invalid parameter dn'
         module.exit_json(**result)
+
 
 def run_module():
     module_args = dict(
