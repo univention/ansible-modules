@@ -133,7 +133,7 @@ def get_apps_status():
 
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
-    return _appname in available_apps_list and not not filter(lambda x: _appname in x, installed_apps_list)
+    return _appname in available_apps_list and bool(filter(lambda x: _appname in x, installed_apps_list))
 
 
 def check_app_absent(_appname):
@@ -143,7 +143,7 @@ def check_app_absent(_appname):
 
 def check_app_upgradeable(_appname):
     ''' check if a given app is in upgradable_apps_list, return bool '''
-    return _appname in available_apps_list and filter(lambda x: _appname in x, upgradable_apps_list)
+    return _appname in available_apps_list and bool(filter(lambda x: _appname in x, upgradable_apps_list))
 
 
 def generate_tmp_auth_file(_data):
