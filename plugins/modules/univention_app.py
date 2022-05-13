@@ -11,7 +11,6 @@
 import os
 import json
 import tempfile
-import platform
 from ansible.module_utils.basic import AnsibleModule
 
 DOCUMENTATION = '''
@@ -89,11 +88,8 @@ changed:
 
 def check_ucs():
     ''' Check if system is actually UCS, return bool '''
-    try:
-        import univention.appcenter
-        return True
-    except ImportError:
-        return False
+    return os.system("dpkg -s univention-appcenter") == 0
+
 
 
 def ansible_exec(action, appname=None, keyfile=None, username=None):
