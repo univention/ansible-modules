@@ -89,7 +89,11 @@ changed:
 
 def check_ucs():
     ''' Check if system is actually UCS, return bool '''
-    return platform.dist()[0].lower() == 'univention'
+    try:
+        import univention.appcenter
+        return True
+    except ImportError:
+        return False
 
 def ansible_exec(action, appname=None, keyfile=None, username=None):
     ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
@@ -126,7 +130,7 @@ def get_apps_status():
 
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
-    return _appname in available_apps_list and filter(lambda x: _appname in x, installed_apps_list)
+    return _appname in available_apps_list and not not filter(lambda x: _appname in x, installed_apps_list)
 
 def check_app_absent(_appname):
     ''' check if a given app is NOT in installed_apps_list, return bool '''
