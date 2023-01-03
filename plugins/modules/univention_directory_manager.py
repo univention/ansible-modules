@@ -51,6 +51,13 @@ options:
         type: str
         choices: [ absent, present ]
         default: present
+    superordinate:
+        description:
+            - When creating a new object, set its superordinate to this DN.
+            - Only affects newly created LDAP objects, this option is ingored for
+              modifications and removals of existing entries.
+        type: str
+        required: False
     set_properties:
         description:
             - A list of dictionaries with the keys property and value.
@@ -82,6 +89,20 @@ EXAMPLES = '''
         value: 'testuser1'
       - property: 'password'
         value: 'mypassword'
+
+# create a DNS record object
+- name: create a dns record
+  univention_directory_manager:
+    module: 'dns/host_record'
+    state: 'present'
+    superordinate: 'zoneName=example.org,cn=dns,dc=example,dc=org'
+    set_properties:
+      - property: 'name'
+        value: 'test'
+      - property: 'a'
+        value: '192.0.2.42'
+      - property: 'a'
+        value: '2001:db8::42'
 
 # delete one or more objects
 - name: delete a user with a search filter
@@ -185,7 +206,7 @@ def apply_options(obj, module):
 
 def _create_object(udm_mod, module, stats):
     params = module.params
-    obj = udm_mod.new()
+    obj = udm_mod.new(superordinate=params.get('superordinate'))
     if params['position']:
         obj.position = params['position']
     apply_options(obj, module)
@@ -306,6 +327,11 @@ def run_module():
             type='str',
             default='present',
             coices=['present', 'absent'],
+            required=False
+        ),
+        superordinate=dict(
+            type='str',
+            default=None,
             required=False
         ),
         options=dict(
