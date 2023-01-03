@@ -25,6 +25,7 @@ position (string) | | The position within the LDAP-tree.
 dn (string) | | The distinguished name of the LDAP object.
 filter (string) | | A LDAP search filter to select objects.
 state (string) | "present" | Either 'present' for creating of modifying the objects given or 'absent' for deleting the objects.
+superordinate (string) | None | When creating a new object, set its superordinate to this DN. Only affects newly created LDAP objects, this option is ingored for modifications and removals of existing entries.
 set_properties (list) | | A list of dictionaries with the keys property and value. Properties of the objects are to be set to the given values.
 unset_properties (list) | | A list of dictionaries with the key property. The listed properties of the objects are to be unset.
 
@@ -45,6 +46,20 @@ unset_properties (list) | | A list of dictionaries with the key property. The li
         value: 'testuser1'
       - property: 'password'
         value: 'univention'
+
+# create a DNS record object
+- name: create a dns record
+  univention_directory_manager:
+    module: 'dns/host_record'
+    state: 'present'
+    superordinate: 'zoneName=example.org,cn=dns,dc=example,dc=org'
+    set_properties:
+      - property: 'name'
+        value: 'test'
+      - property: 'a'
+        value: '192.0.2.42'
+      - property: 'a'
+        value: '2001:db8::42'
 
 # delete one or more objects
 - name: delete a user with a search filter
