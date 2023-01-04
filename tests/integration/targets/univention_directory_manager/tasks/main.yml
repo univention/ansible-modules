@@ -17,6 +17,25 @@
       - property: "password"
         value: "univention"
 
+- name: "create an extended attribute with superordinary param and complex attributes"
+  univention_directory_manager:
+    module: "settings/extended_attribute"
+    superordinate: "cn=custom attributes,cn=univention,{{ base_dn.stdout }}"
+    state: "present"
+    set_properties:
+      - property: "name"
+        value: "testAttribute"
+      - property: "shortDescription"
+        value: "This is a test attribute"
+      - property: "translationShortDescription"
+        value: [["de_DE", "Dies ist ein Test-Attribut"]]
+      - property: "module"
+        value: ["users/user", "groups/group"]
+      - property: "objectClass"
+        value: "customAttributeGroups"
+      - property: "ldapMapping"
+        value: "customAttributeTestAttribute"
+
 - name: "modify testuser1 - add or change a property"
   univention_directory_manager:
     module: "users/user"
