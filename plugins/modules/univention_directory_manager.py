@@ -90,19 +90,27 @@ EXAMPLES = '''
       - property: 'password'
         value: 'mypassword'
 
-# create a DNS record object
-- name: create a dns record
+# create an extended attribute
+- name: "create an extended attribute with superordinary param and complex attributes"
   univention_directory_manager:
-    module: 'dns/host_record'
-    state: 'present'
-    superordinate: 'zoneName=example.org,cn=dns,dc=example,dc=org'
+    module: "settings/extended_attribute"
+    superordinate: "cn=custom attributes,cn=univention,dc=example,dc=org"
+    state: "present"
     set_properties:
-      - property: 'name'
-        value: 'test'
-      - property: 'a'
-        value: '192.0.2.42'
-      - property: 'a'
-        value: '2001:db8::42'
+      - property: "name"
+        value: "testAttribute"
+      - property: "shortDescription"
+        value: "This is a test attribute"
+      - property: "module"
+        # Multivalued properties must be provided as a list
+        value: ["users/user", "groups/group"]
+      - property: "translationShortDescription"
+        # Complex types must be provided in their parsed tuple form, always nested inside a list
+        value: [["de_DE", "Dies ist ein Test-Attribut"]]
+      - property: "objectClass"
+        value: "customAttributeGroups"
+      - property: "ldapMapping"
+        value: "customAttributeTestAttribute"
 
 # delete one or more objects
 - name: delete a user with a search filter
