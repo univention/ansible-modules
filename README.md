@@ -3,14 +3,22 @@
 The Ansible Univention Corporate Server Modules Collections contains a variety of Ansible modules to help automate the
 management of Univention Corporate Server instances.
 
-## Ansible version compatibility
+## Compatibilities
+
+### Univention version compatibility
+
+This collection has been tested against following UCS versions: < 4.2
+
+Since UCS 5.0 `ansible_python_interpreter=/usr/bin/python3` is required.
+
+### Ansible version compatibility
 
 This collection has been tested against following Ansible versions: >= 2.11
 
 Plugins and modules within a collection may be tested with only specific Ansible versions. A collection may contain
 metadata that identifies these versions.
 
-## Python version compatibility
+### Python version compatibility
 
 This collection has been tested against following Python versions: >= 2.7 or >= 3.9
 
@@ -30,8 +38,7 @@ You can install the Univention Corporate Server Modules collection with the Ansi
 ansible-galaxy collection install univention.ucs_modules
 ```
 
-You can also include it in a `requirements.yml` file and install it with ansible-galaxy collection install -r
-`requirements.yml`, using the format:
+You can also include it in a `requirements.yml` file and install it with `ansible-galaxy collection install -r requirements.yml`, using the format:
 
 ```yaml
 ---
