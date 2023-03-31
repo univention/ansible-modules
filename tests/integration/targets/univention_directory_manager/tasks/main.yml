@@ -5,7 +5,7 @@
   register: "base_dn"
   changed_when: "base_dn.stdout is search('dn=')"
 
-- name: "create a user"
+- name: "Create a user"
   univention_directory_manager:
     module: "users/user"
     state: "present"
@@ -17,7 +17,7 @@
       - property: "password"
         value: "univention"
 
-- name: "modify testuser1 - add or change a property"
+- name: "Modify testuser1 - add or change a property"
   univention_directory_manager:
     module: "users/user"
     state: "present"
@@ -26,7 +26,7 @@
       - property: "firstname"
         value: "max"
 
-- name: "modify testuser1 - remove property"
+- name: "Modify testuser1 - remove property"
   univention_directory_manager:
     module: "users/user"
     state: "present"
@@ -35,13 +35,13 @@
       - property: "firstname"
         value: "does not matter"
 
-- name: "delete a user with a search filter"
+- name: "Delete a user with a search filter"
   univention_directory_manager:
     module: "users/user"
     state: "absent"
     filter: "(uid=testuser1)"
 
-- name: "create a custom OU"
+- name: "Create a custom OU"
   univention_directory_manager:
     module: "container/ou"
     state: "present"
@@ -51,7 +51,7 @@
       - property: "userPath"
         value: "1"
 
-- name: "create a user with position"
+- name: "Create a user with position"
   univention_directory_manager:
     module: "users/user"
     state: "present"
@@ -64,7 +64,7 @@
       - property: "password"
         value: "univention"
 
-- name: "delete the user with position"
+- name: "Delete the user with position"
   univention_directory_manager:
     module: "users/user"
     state: "absent"
