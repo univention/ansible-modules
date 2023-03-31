@@ -332,8 +332,7 @@ def run_module():
     if not have_udm:
         module.fail_json(msg='The Python "univention.udm" is not available', **result)
 
-    udm_con = UDM.admin()  # connection to UDM
-    udm_con.version(1)
+    udm_con = UDM.admin().version(2)  # connection to UDM
     udm_mod = udm_con.get(module.params['module'])
     stats = Stats()
 
