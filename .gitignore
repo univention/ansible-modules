@@ -1,1 +1,7 @@
 .cache/
+.vagrant
+*.log
+*.vault*
+
+Python
+__pycache__/

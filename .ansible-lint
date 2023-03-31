@@ -1,6 +1,7 @@
 ---
 # .ansible-lint
-exclude_paths: []
+exclude_paths:
+  - "tests/integration/targets/dev*"
 # parseable: true
 # quiet: true
 # verbosity: 1
