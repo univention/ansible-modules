@@ -139,141 +139,190 @@ message:
     description: A human-readable information about which objects were changed.
 '''
 
+import traceback # noqa F401
+
 from ansible.module_utils.basic import AnsibleModule  # noqa F401
 
+UDM_IMP_ERR = None
 try:
-    from univention.udm import UDM
     import univention.udm
-
     HAS_UDM = True
 except ModuleNotFoundError:
     HAS_UDM = False
+    UDM_IMP_ERR = traceback.format_exc()
 
 
-class Stats:
-    changed_objects = []
+class UDMAnsibleModule():
+    '''UDMAnsibleModule
+    '''
+    def __init__(self, module):
+        # Class
+        self.changed_objects = []
+        self.result = dict(
+            changed=False,
+            debug=dict(
+                type=dict()
+            ),
+            message='',
+            meta=dict(
+                changed_objects=self.changed_objects,
+                message='',
+                ),
+            msg='',  # traceback when missing
+        )
+        self.ansible_module = module
+        self.ansible_params = module.params
 
+    def _check_univention_import_errors(self):
+        if not HAS_UDM:
+            self.result["message"] = "The python module 'univention.udm' is not available."
+            self.result["exception"] = UDM_IMP_ERR
+            self.ansible_module.fail_json(**self.result)
 
-def _set_property(obj, prop, value):
-    setattr(obj.props, prop, value)
+    def _get_udm_connection(self):
+        try:
+            udm_con = univention.udm.UDM.admin().version(2)
+        except univention.udm.exceptions.ConnectionError:
+            self.result["message"] = "Does your user have access to '/etc/ldap.secret'?"
+            self.result["exception"] = traceback.format_exc()
+            self.ansible_module.fail_json(**self.result)
+        return udm_con
 
+    def _get_udm_module(self, udm_con, udm_module):
+        try:
+            _udm_module = udm_con.get(udm_module)
+        except univention.udm.exceptions.UnknownModuleType:
+            self.result["message"] = "UDM not up to date? Module '{}' not found.".format(udm_module)
+            self.result["exception"] = traceback.format_exc()
+            self.ansible_module.fail_json(**self.result)
+        return _udm_module
 
-def _create_or_modify_object(dn, udm_mod, module, stats):
-    try:
-        obj = udm_mod.get(dn)
-    except Exception:
-        obj = None
-    if obj:
-        _modify_object(udm_mod, module, obj, stats)
-    else:
-        _create_object(udm_mod, module, stats)
-
-
-def apply_policies(obj, module):
-    params = module.params
-    if params['policies']:
-        obj.policies = params['policies']
-
-
-def apply_options(obj, module):
-    params = module.params
-    if params['options']:
-        obj.options = []
-        for opt in params['options']:
-            obj.options.append(opt)
-
-
-def _create_object(udm_mod, module, stats):
-    params = module.params
-    obj = udm_mod.new()
-    if params['position']:
-        obj.position = params['position']
-    apply_options(obj, module)
-    apply_policies(obj, module)
-    if params['set_properties']:
-        for attr in params['set_properties']:
-            prop_name = attr['property']
-            prop_value = attr['value']
-            _set_property(obj, prop_name, prop_value)
-    if not module.check_mode:
-        obj.save()
-        stats.changed_objects.append(obj.dn)
-
-
-def _modify_object(udm_mod, module, obj, stats):
-    params = module.params
-    apply_options(obj, module)
-    apply_policies(obj, module)
-    if params['unset_properties']:
-        for attr in params['unset_properties']:
-            prop_name = attr['property']
-            _set_property(obj, prop_name, None)
-    if params['set_properties']:
-        for attr in params['set_properties']:
-            prop_name = attr['property']
-            prop_value = attr['value']
-            _set_property(obj, prop_name, prop_value)
-    if not module.check_mode:
-        obj.save()
-        stats.changed_objects.append(obj.dn)
-
-
-def _remove_objects(udm_mod, module, stats):
-    params = module.params
-    if module.check_mode:
-        return
-    if params['dn']:
-        obj = udm_mod.get(params['dn'])
-        if not module.check_mode:
-            obj.delete()
-            stats.changed_objects.append(obj.dn)
-    if params['filter']:
-        for baseobject in udm_mod.search(params['filter']):
-            obj = udm_mod.get(baseobject.dn)
-            if not module.check_mode:
-                obj.delete()
-                stats.changed_objects.append(obj.dn)
-
-
-def _get_object_by_property(udm_mod, module):
-    try:
-        for prop in module.params['set_properties']:
-            if prop['property'] == udm_mod.meta.identifying_property:
-                return udm_mod.get_by_id(prop['value'])
-        else:
+    def _extract_properties_from_dn(self):
+        if not self.ansible_params['dn']:
             return None
-    except univention.udm.exceptions.NoObject:
-        return None
-    except univention.udm.exceptions.MultipleObjects:
-        return None
-    except TypeError:
-        return None
+        try:
+            name, position = self.ansible_params['dn'].split(',', 1)
+            name = name.split('=', 1)[1]
+            if not self.ansible_params['set_properties']:
+                self.ansible_params['set_properties'] = []
+            self.ansible_params['set_properties'].append(
+                {'property': self.udm_module.meta.identifying_property, 'value': name}
+            )
+            self.ansible_params['position'] = position
+        except IndexError:
+            # FIXME: message should be message and not meta message
+            # FIXME: invalid should be module.fail_json
+            self.result['meta']['message'] = 'Invalid parameter dn'
+            self.ansible_module.exit_json(**self.result)
 
+    def _get_object_by_property(self):
+        try:
+            for prop in self.ansible_params['set_properties']:
+                if prop['property'] == self.udm_module.meta.identifying_property:
+                    return self.udm_module.get_by_id(prop['value'])
+            else:
+                return None
+        except univention.udm.exceptions.NoObject:
+            return None
+        except univention.udm.exceptions.MultipleObjects:
+            return None
+        except TypeError:
+            return None
 
-def _get_object_by_dn(udm_mod, module):
-    try:
-        if module.params['dn']:
-            return udm_mod.get(module.params['dn'])
-    except univention.udm.exceptions.NoObject:
-        pass
-    except univention.udm.exceptions.MultipleObjects:
-        pass
-    return None
+    def _get_udm_obj_by_property(self):
+        obj_by_property = []
+        obj = self._get_object_by_property()
+        if obj:
+            obj_by_property.append(obj)
+        return obj_by_property
 
+    def _get_udm_obj_by_filter(self):
+        obj_by_filter = []
+        if self.ansible_params['filter']:
+            for obj in self.udm_module.search(self.ansible_params['filter']):
+                obj_by_filter.append(obj)
+        return obj_by_filter
 
-def _extract_properties_from_dn(udm_mod, module, result):
-    if not module.params['dn']:
-        return
-    try:
-        name, position = module.params['dn'].split(',', 1)
-        name = name.split('=', 1)[1]
-        if not module.params['set_properties']:
-            module.params['set_properties'] = []
-        module.params['set_properties'].append({'property': udm_mod.meta.identifying_property, 'value': name})
-        module.params['position'] = position
-    except IndexError:
-        result['meta']['message'] = 'Invalid parameter dn'
-        module.exit_json(**result)
+    def _set_property(self, obj, prop, value):
+        setattr(obj.props, prop, value)
+
+    def _apply_policies(self, obj):
+        if self.ansible_params['policies']:
+            obj.policies = self.ansible_params['policies']
+
+    def _apply_options(self, obj):
+        if self.ansible_params['options']:
+            obj.options = []
+            for option in self.ansible_params['options']:
+                obj.options.append(option)
+
+    def _create_object(self):
+        obj = self.udm_module.new()
+        if self.ansible_params['position']:
+            obj.position = self.ansible_params['position']
+        self._apply_options(obj)
+        self._apply_policies(obj)
+        if self.ansible_params['set_properties']:
+            for attr in self.ansible_params['set_properties']:
+                prop_name = attr['property']
+                prop_value = attr['value']
+                self._set_property(obj, prop_name, prop_value)
+        if not self.ansible_module.check_mode:
+            obj.save()
+            self.changed_objects.append(obj.dn)
+
+    def _modify_object(self, obj):
+        self._apply_options(obj)
+        self._apply_policies(obj)
+        if self.ansible_params['unset_properties']:
+            for attr in self.ansible_params['unset_properties']:
+                prop_name = attr['property']
+                self._set_property(obj, prop_name, None)
+        if self.ansible_params['set_properties']:
+            for attr in self.ansible_params['set_properties']:
+                prop_name = attr['property']
+                prop_value = attr['value']
+                self._set_property(obj, prop_name, prop_value)
+        if not self.ansible_module.check_mode:
+            obj.save()
+            self.changed_objects.append(obj.dn)
+
+    def _remove_objects(self):
+        if self.ansible_module.check_mode:
+            return
+        if self.ansible_params['dn']:
+            obj = self.udm_module.get(self.ansible_params['dn'])
+            if not self.ansible_module.check_mode:
+                obj.delete()
+                self.changed_objects.append(obj.dn)
+        if self.ansible_params['filter']:
+            for baseobject in self.udm_module.search(self.ansible_params['filter']):
+                obj = self.udm_module.get(baseobject.dn)
+                if not self.ansible_module.check_mode:
+                    obj.delete()
+                    self.changed_objects.append(obj.dn)
+
+    def run(self):
+        # univention module
+        self._check_univention_import_errors()
+        udm_con = self._get_udm_connection()
+        self.udm_module = self._get_udm_module(udm_con, self.ansible_params['module'])
+        self._extract_properties_from_dn()
+        # get udm_objects
+        udm_objects = self._get_udm_obj_by_filter()
+        udm_objects += self._get_udm_obj_by_property()
+        # State present
+        if self.ansible_params['state'] == 'present':
+            for obj in udm_objects:
+                self._modify_object(obj)
+            if not udm_objects:
+                self._create_object()
+        # State absent
+        elif self.ansible_params['state'] == 'absent':
+            for obj in udm_objects:
+                self._remove_objects()
+        self.result['meta']['message'] = 'changed objects: %s' " ".join(self.changed_objects)
+        self.ansible_module.exit_json(**self.result)
 
 
 def run_module():
@@ -323,45 +372,8 @@ def run_module():
         supports_check_mode=True
     )
 
-    result = dict(
-        changed=False,
-        meta=dict(changed_objects=[]),
-        message=''
-    )
-
-    if not HAS_UDM:
-        module.fail_json(msg='The Python "univention.udm" is not available', **result)
-
-    udm_con = UDM.admin().version(2)  # connection to UDM
-    udm_mod = udm_con.get(module.params['module'])
-    stats = Stats()
-
-    _extract_properties_from_dn(udm_mod, module, result)
-    params = module.params
-
-    obj_by_filter = []
-    if params['filter']:
-        for obj in udm_mod.search(params['filter']):
-            obj_by_filter.append(obj)
-
-    obj_by_property = []
-    obj = _get_object_by_property(udm_mod, module)
-    if obj:
-        obj_by_property.append(obj)
-
-    if params['state'] == 'present':
-        for obj in obj_by_filter + obj_by_property:
-            _modify_object(udm_mod, module, obj, stats)
-        if len(obj_by_filter) == 0 and len(obj_by_property) == 0:
-            _create_object(udm_mod, module, stats)
-
-    elif params['state'] == 'absent':
-        for obj in obj_by_filter + obj_by_property:
-            _remove_objects(udm_mod, module, stats)
-    result['meta']['changed_objects'] = stats.changed_objects
-    result['meta']['message'] = 'changed objects: %s' " ".join(stats.changed_objects)
-
-    module.exit_json(**result)
+    udm_ansible_module = UDMAnsibleModule(module)
+    udm_ansible_module.run()
 
 
 if __name__ == '__main__':
