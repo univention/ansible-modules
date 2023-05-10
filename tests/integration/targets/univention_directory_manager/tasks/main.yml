@@ -16,6 +16,7 @@
         value: "testuser1"
       - property: "password"
         value: "univention"
+        foo: "test"
 
 - name: "Modify testuser1 - add or change a property"
   univention_directory_manager:
@@ -69,3 +70,114 @@
     module: "users/user"
     state: "absent"
     dn: "uid=testuser2,ou=temp,{{ base_dn.stdout }}"
+
+- name: "Python2 - Create a portal_entry with binary attr"
+  vars:
+    ansible_python_interpreter: "/usr/bin/python2"
+  univention_directory_manager:
+    module: "portals/entry"
+    state: "present"
+    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "name"
+        value: "test-entry"
+      - property: "target"
+        value: "foo"
+      - property: "backgroundColor"
+        value: "#FFCE36"
+      - property: "displayName"
+        value:
+          - ["en_US", "TEST - DisplayName"]
+      - property: "description"
+        value:
+          - ["en_US", "TEST - Description"]
+      - property: "link"
+        value:
+          - ["en_US", "TEST - Link"]
+      - property: "icon"
+        value: |
+          PHN2ZyBpZD0iRWJlbmVfMSIgZGF0YS1uYW1lPSJFYmVuZSAxIiB4bWxucz0iaHR0cDovL3d3dy53
+          My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MCA2MyI+PGRlZnM+PHN0eWxlPi5jbHMtMXtm
+          aWxsOiNlZWVmZjE7fS5jbHMtMntmaWxsOiM4YTkxOTk7fS5jbHMtM3tmaWxsOiMzYTQyNGI7fTwv
+          c3R5bGU+PC9kZWZzPjxjaXJjbGUgY2xhc3M9ImNscy0xIiBjeD0iNDAiIGN5PSIzNi4wNCIgcj0i
+          MjAuMSIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTQ1LjMyLDQzLjI4Yy0xLjQ0LDEuNDQtMy42
+          OCw0LTMuNzEsNGwuMjUtMy41M3MuNjMtLjUyLDItMS45M2MyLjMzLTIuMzMsMS43OC03LjA3LTEt
+          OS44OS0yLjM4LTIuMzgtOS04LjYxLTE4LjE4LTE4QTQxLjU2LDQxLjU2LDAsMCwwLDM2LjUzLDM2
+          Ljg0bC0xLjYyLDEuNzhhNDEuNDEsNDEuNDEsMCwwLDEtMTMtMzAuODVjMywzLjkxLDEzLDEyLjg2
+          LDIyLjQzLDIyLjI4QzQ3LjA1LDMyLjc1LDQ5LjQyLDM5LjE4LDQ1LjMyLDQzLjI4WiIvPjxwYXRo
+          IGNsYXNzPSJjbHMtMyIgZD0iTTQyLjgyLDM0LjM1YTcuNTUsNy41NSwwLDAsMSwuODUsMy4xOEMz
+          OSw0Mi4xOCwzMS4yMyw1MC4xNSwzMS4yMyw1MC4xNVY0Ni4yNEMzMS42LDQ1Ljg2LDM4LjkzLDM4
+          LjI1LDQyLjgyLDM0LjM1WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTU1LjgzLDMybC0xLjU4
+          LDIuMzlhNi45MSw2LjkxLDAsMCwwLTUuNi0xLDYuNTEsNi41MSwwLDAsMC0xLjcsMSwxMS41OCwx
+          MS41OCwwLDAsMC0xLjI0LTIuNjQsOS42OCw5LjY4LDAsMCwxLDEuNy0uOTNBOS42OSw5LjY5LDAs
+          MCwxLDU1LjgzLDMyWiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTM3Ljc0LDIwLjg4LDM1LDE0
+          Ljc3Yy0uNDYsMS42NS0uNiwyLjM4LS42NiwyLjYxbC0yLTJhMzUuMTQsMzUuMTQsMCwwLDEsLjY1
+          LTMuNzdjLjI2LTEuMTgsMS4zNS00Ljc2LDEuMzUtNC43Nmw5LjIxLDE5LjYxWiIvPjwvc3ZnPg==
+
+- name: "Python2 - Remove a portal_entry with binary attr"
+  vars:
+    ansible_python_interpreter: "/usr/bin/python2"
+  univention_directory_manager:
+    module: "portals/entry"
+    state: "absent"
+    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "name"
+        value: "test-entry"
+
+- name: "Python3 - Create a portal_entry with binary attr"
+  vars:
+    ansible_python_interpreter: "/usr/bin/python3"
+  univention_directory_manager:
+    module: "portals/entry"
+    state: "present"
+    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "name"
+        value: "test-entry"
+      - property: "target"
+        value: "foo"
+      - property: "backgroundColor"
+        value: "#FFCE36"
+      - property: "displayName"
+        value:
+          - ["en_US", "Test - displayname"]
+          - ["de_DE", "Test - Anzeigename"]
+      - property: "description"
+        value:
+          - ["en_US", "Test - description"]
+          - ["de_DE", "Test - Beschreibung"]
+      - property: "link"
+        value:
+          - [ "en_US", "TEST - Link" ]
+          - [ "de_DE", "TEST - Link" ]
+      - property: "icon"
+        value: |
+          PHN2ZyBpZD0iRWJlbmVfMSIgZGF0YS1uYW1lPSJFYmVuZSAxIiB4bWxucz0iaHR0cDovL3d3dy53
+          My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MCA2MyI+PGRlZnM+PHN0eWxlPi5jbHMtMXtm
+          aWxsOiNlZWVmZjE7fS5jbHMtMntmaWxsOiM4YTkxOTk7fS5jbHMtM3tmaWxsOiMzYTQyNGI7fTwv
+          c3R5bGU+PC9kZWZzPjxjaXJjbGUgY2xhc3M9ImNscy0xIiBjeD0iNDAiIGN5PSIzNi4wNCIgcj0i
+          MjAuMSIvPjxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTQ1LjMyLDQzLjI4Yy0xLjQ0LDEuNDQtMy42
+          OCw0LTMuNzEsNGwuMjUtMy41M3MuNjMtLjUyLDItMS45M2MyLjMzLTIuMzMsMS43OC03LjA3LTEt
+          OS44OS0yLjM4LTIuMzgtOS04LjYxLTE4LjE4LTE4QTQxLjU2LDQxLjU2LDAsMCwwLDM2LjUzLDM2
+          Ljg0bC0xLjYyLDEuNzhhNDEuNDEsNDEuNDEsMCwwLDEtMTMtMzAuODVjMywzLjkxLDEzLDEyLjg2
+          LDIyLjQzLDIyLjI4QzQ3LjA1LDMyLjc1LDQ5LjQyLDM5LjE4LDQ1LjMyLDQzLjI4WiIvPjxwYXRo
+          IGNsYXNzPSJjbHMtMyIgZD0iTTQyLjgyLDM0LjM1YTcuNTUsNy41NSwwLDAsMSwuODUsMy4xOEMz
+          OSw0Mi4xOCwzMS4yMyw1MC4xNSwzMS4yMyw1MC4xNVY0Ni4yNEMzMS42LDQ1Ljg2LDM4LjkzLDM4
+          LjI1LDQyLjgyLDM0LjM1WiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTU1LjgzLDMybC0xLjU4
+          LDIuMzlhNi45MSw2LjkxLDAsMCwwLTUuNi0xLDYuNTEsNi41MSwwLDAsMC0xLjcsMSwxMS41OCwx
+          MS41OCwwLDAsMC0xLjI0LTIuNjQsOS42OCw5LjY4LDAsMCwxLDEuNy0uOTNBOS42OSw5LjY5LDAs
+          MCwxLDU1LjgzLDMyWiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTM3Ljc0LDIwLjg4LDM1LDE0
+          Ljc3Yy0uNDYsMS42NS0uNiwyLjM4LS42NiwyLjYxbC0yLTJhMzUuMTQsMzUuMTQsMCwwLDEsLjY1
+          LTMuNzdjLjI2LTEuMTgsMS4zNS00Ljc2LDEuMzUtNC43Nmw5LjIxLDE5LjYxWiIvPjwvc3ZnPg==
+
+- name: "Python3 - Remove a portal_entry with binary attr"
+  vars:
+    ansible_python_interpreter: "/usr/bin/python3"
+  univention_directory_manager:
+    module: "portals/entry"
+    state: "absent"
+    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "name"
+        value: "test-entry"
