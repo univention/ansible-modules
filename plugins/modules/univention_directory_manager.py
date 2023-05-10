@@ -245,8 +245,14 @@ class UDMAnsibleModule():
                 obj_by_filter.append(obj)
         return obj_by_filter
 
+    def _decode_value(self, obj, prop, value):
+        if prop in obj.props._encoders:
+            encoder = obj.props._encoders.get(prop)
+            value = encoder(prop).decode(value)
+        return value
+
     def _set_property(self, obj, prop, value):
-        setattr(obj.props, prop, value)
+        setattr(obj.props, prop, self._decode_value(obj, prop, value))
 
     def _apply_policies(self, obj):
         if self.ansible_params['policies']:
