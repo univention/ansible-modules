@@ -145,9 +145,9 @@ try:
     from univention.udm import UDM
     import univention.udm
 
-    have_udm = True
+    HAS_UDM = True
 except ModuleNotFoundError:
-    have_udm = False
+    HAS_UDM = False
 
 
 class Stats:
@@ -329,7 +329,7 @@ def run_module():
         message=''
     )
 
-    if not have_udm:
+    if not HAS_UDM:
         module.fail_json(msg='The Python "univention.udm" is not available', **result)
 
     udm_con = UDM.admin().version(2)  # connection to UDM
