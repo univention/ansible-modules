@@ -70,6 +70,43 @@
     state: "absent"
     dn: "uid=testuser2,ou=temp,{{ base_dn.stdout }}"
 
+- name: "Check policy setting - Create group with policy"
+  univention_directory_manager:
+    module: "groups/group"
+    state: "present"
+    dn: "cn=Test Domain Group,cn=groups,{{ base_dn.stdout }}"
+    policies:
+      - "cn=default-umc-users,cn=UMC,cn=policies,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "description"
+        value: "Test Group"
+      - property: "sambaGroupType"
+        value: "2"
+
+- name: "Remove Check policy setting - Remove group with policy"
+  univention_directory_manager:
+    module: "groups/group"
+    state: "absent"
+    dn: "cn=Test Domain Group,cn=groups,{{ base_dn.stdout }}"
+    policies:
+      - "cn=default-umc-users,cn=UMC,cn=policies,{{ base_dn.stdout }}"
+
+- name: "Check existing Object don't return traceback"
+  univention_directory_manager:
+    module: "portals/category"
+    state: "present"
+    dn: "cn=domain-service,cn=category,cn=portals,cn=univention,{{ base_dn.stdout }}"
+    set_properties:
+      - property: "displayName"
+        value:
+          en_US: "Applications"
+          de_DE: "Applikation"
+          fr_FR: "Applications"
+      - property: "entries"
+        value:
+          - "cn=login-ucs,cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+          - "cn=login-saml,cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+
 - name: "Python2 - Create a portal_entry with binary attr"
   vars:
     ansible_python_interpreter: "/usr/bin/python2"
