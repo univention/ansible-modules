@@ -15,8 +15,7 @@
       - property: "lastname"
         value: "testuser1"
       - property: "password"
-        value: "univention"
-        foo: "test"
+        value: "{{ lookup('ansible.builtin.password', '/dev/null') }}"
 
 - name: "Modify testuser1 - add or change a property"
   univention_directory_manager:
@@ -63,7 +62,7 @@
       - property: "lastname"
         value: "testuser2"
       - property: "password"
-        value: "univention"
+        value: "{{ lookup('ansible.builtin.password', '/dev/null') }}"
 
 - name: "Delete the user with position"
   univention_directory_manager:
