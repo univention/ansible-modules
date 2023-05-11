@@ -137,7 +137,7 @@ EXAMPLES = '''
 RETURN = '''
 meta['changed_objects']:
     description: A list of all objects that were changed.
-message:
+msg:
     description: A human-readable information about which objects were changed.
 '''
 
@@ -161,36 +161,32 @@ class UDMAnsibleModule():
     udm_api_version = 2
     udm_module = None
 
+    changed_objects = []
+    result = dict(
+        changed=False,
+        meta=dict(
+            changed_objects=changed_objects,
+            ),
+        msg='',
+    )
+
     def __init__(self, module):
         # Class
-        self.changed_objects = []
-        self.result = dict(
-            changed=False,
-            debug=dict(
-                type=dict()
-            ),
-            message='',
-            meta=dict(
-                changed_objects=self.changed_objects,
-                message='',
-                ),
-            msg='',  # traceback when missing
-        )
         self.ansible_module = module
         self.ansible_params = module.params
 
     def _check_univention_import_errors(self):
         if not HAS_UDM:
-            self.result["message"] = "The python module 'univention.udm' is not available."
-            self.result["exception"] = UDM_IMP_ERR
+            self.result['msg'] = "The python module 'univention.udm' is not available."
+            self.result['exception'] = UDM_IMP_ERR
             self.ansible_module.fail_json(**self.result)
 
     def _get_udm_connection(self):
         try:
             udm_con = univention.udm.UDM.admin().version(self.udm_api_version)
         except univention.udm.exceptions.ConnectionError:
-            self.result["message"] = "Does your user have access to '/etc/ldap.secret'?"
-            self.result["exception"] = traceback.format_exc()
+            self.result['msg'] = "Does your user have access to '/etc/ldap.secret'?"
+            self.result['exception'] = traceback.format_exc()
             self.ansible_module.fail_json(**self.result)
         return udm_con
 
@@ -198,8 +194,8 @@ class UDMAnsibleModule():
         try:
             _udm_module = udm_con.get(udm_module)
         except univention.udm.exceptions.UnknownModuleType:
-            self.result["message"] = "UDM not up to date? Module '{}' not found.".format(udm_module)
-            self.result["exception"] = traceback.format_exc()
+            self.result['msg'] = "UDM not up to date? Module '{}' not found.".format(udm_module)
+            self.result['exception'] = traceback.format_exc()
             self.ansible_module.fail_json(**self.result)
         return _udm_module
 
@@ -216,9 +212,8 @@ class UDMAnsibleModule():
             )
             self.ansible_params['position'] = position
         except IndexError:
-            # FIXME: message should be message and not meta message
             # FIXME: invalid should be module.fail_json
-            self.result['meta']['message'] = 'Invalid parameter dn'
+            self.result['msg'] = 'Invalid parameter dn'
             self.ansible_module.exit_json(**self.result)
 
     def _get_object_by_property(self):
@@ -327,7 +322,7 @@ class UDMAnsibleModule():
         elif self.ansible_params['state'] == 'absent':
             for obj in udm_objects:
                 self._remove_objects(obj)
-        self.result['meta']['message'] = 'changed objects: %s' " ".join(self.changed_objects)
+        self.result['msg'] = 'changed objects: %s' " ".join(self.changed_objects)
         self.ansible_module.exit_json(**self.result)
 
 
