@@ -25,6 +25,7 @@ position (string) | | The position within the LDAP-tree.
 dn (string) | | The distinguished name of the LDAP object.
 filter (string) | | A LDAP search filter to select objects.
 state (string) | "present" | Either 'present' for creating of modifying the objects given or 'absent' for deleting the objects.
++superordinate (string) | None | When creating a new object, set its superordinate to this DN. Only affects newly created LDAP objects, this option is ingored for modifications and removals of existing entries.
 set_properties (list) | | A list of dictionaries with the keys property and value. Properties of the objects are to be set to the given values.
 unset_properties (list) | | A list of dictionaries with the key property. The listed properties of the objects are to be unset.
 
@@ -45,6 +46,28 @@ unset_properties (list) | | A list of dictionaries with the key property. The li
         value: 'testuser1'
       - property: 'password'
         value: 'univention'
+
+# create an extended attribute
+- name: "create an extended attribute with superordinary param and complex attributes"
+  univention_directory_manager:
+    module: "settings/extended_attribute"
+    superordinate: "cn=custom attributes,cn=univention,dc=example,dc=org"
+    state: "present"
+    set_properties:
+      - property: "name"
+        value: "testAttribute"
+      - property: "shortDescription"
+        value: "This is a test attribute"
+      - property: "module"
+        # Multivalued properties must be provided as a list
+        value: ["users/user", "groups/group"]
+      - property: "translationShortDescription"
+        # Complex types must be provided in their parsed tuple form, always nested inside a list
+        value: [["de_DE", "Dies ist ein Test-Attribut"]]
+      - property: "objectClass"
+        value: "customAttributeGroups"
+      - property: "ldapMapping"
+        value: "customAttributeTestAttribute"
 
 # delete one or more objects
 - name: delete a user with a search filter
