@@ -295,20 +295,10 @@ class UDMAnsibleModule():
             obj.save()
             self.changed_objects.append(obj.dn)
 
-    def _remove_objects(self):
-        if self.ansible_module.check_mode:
-            return
-        if self.ansible_params['dn']:
-            obj = self.udm_module.get(self.ansible_params['dn'])
-            if not self.ansible_module.check_mode:
-                obj.delete()
-                self.changed_objects.append(obj.dn)
-        if self.ansible_params['filter']:
-            for baseobject in self.udm_module.search(self.ansible_params['filter']):
-                obj = self.udm_module.get(baseobject.dn)
-                if not self.ansible_module.check_mode:
-                    obj.delete()
-                    self.changed_objects.append(obj.dn)
+    def _remove_objects(self, obj):
+        if not self.ansible_module.check_mode:
+            obj.delete()
+            self.changed_objects.append(obj.dn)
 
     def run(self):
         # univention module
@@ -328,7 +318,7 @@ class UDMAnsibleModule():
         # State absent
         elif self.ansible_params['state'] == 'absent':
             for obj in udm_objects:
-                self._remove_objects()
+                self._remove_objects(obj)
         self.result['meta']['message'] = 'changed objects: %s' " ".join(self.changed_objects)
         self.ansible_module.exit_json(**self.result)
 
