@@ -157,6 +157,10 @@ except ModuleNotFoundError:
 class UDMAnsibleModule():
     '''UDMAnsibleModule
     '''
+
+    udm_api_version = 2
+    udm_module = None
+
     def __init__(self, module):
         # Class
         self.changed_objects = []
@@ -183,7 +187,7 @@ class UDMAnsibleModule():
 
     def _get_udm_connection(self):
         try:
-            udm_con = univention.udm.UDM.admin().version(2)
+            udm_con = univention.udm.UDM.admin().version(self.udm_api_version)
         except univention.udm.exceptions.ConnectionError:
             self.result["message"] = "Does your user have access to '/etc/ldap.secret'?"
             self.result["exception"] = traceback.format_exc()
