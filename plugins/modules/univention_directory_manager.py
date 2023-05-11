@@ -362,7 +362,7 @@ def run_module():
         state=dict(
             type='str',
             default='present',
-            coices=['present', 'absent'],
+            choices=['present', 'absent'],
             required=False
         ),
         options=dict(
