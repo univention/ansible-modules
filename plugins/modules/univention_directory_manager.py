@@ -53,6 +53,13 @@ options:
         type: str
         choices: [ absent, present ]
         default: present
+    superordinate:
+        description:
+            - When creating a new object, set its superordinate to this DN.
+            - Only affects newly created LDAP objects, this option is ignored for
+              modifications and removals of existing entries.
+        type: str
+        required: False
     set_properties:
         description:
             - A list of dictionaries with the keys property and value.
@@ -91,6 +98,28 @@ EXAMPLES = '''
     module: 'users/user'
     state: 'absent'
     filter: '(uid=testuser1)'
+
+# create an extended attribute
+- name: "create an extended attribute with superordinary param and complex attributes"
+  univention_directory_manager:
+    module: "settings/extended_attribute"
+    state: "present"
+    superordinate: "cn=custom attributes,cn=univention,dc=example,dc=org"
+    set_properties:
+      - property: "name"
+        value: "testAttribute"
+      - property: "shortDescription"
+        value: "This is a test attribute"
+      - property: "module"
+        # Multivalued properties must be provided as a list
+        value: ["users/user", "groups/group"]
+      - property: "translationShortDescription"
+        # Complex types must be provided in their parsed tuple form, always nested inside a list
+        value: [["de_DE", "Dies ist ein Test-Attribut"]]
+      - property: "objectClass"
+        value: "customAttributeGroups"
+      - property: "ldapMapping"
+        value: "customAttributeTestAttribute"
 
 # use position to place the object in the directory tree
 - name: create a user with position
@@ -267,7 +296,9 @@ class UDMAnsibleModule():
                 obj.options.append(option)
 
     def _create_object(self):
-        obj = self.udm_module.new()
+        obj = self.udm_module.new(
+            superordinate=self.ansible_params.get('superordinate')
+        )
         if self.ansible_params['position']:
             obj.position = self.ansible_params['position']
         self._apply_options(obj)
@@ -363,6 +394,11 @@ def run_module():
         ),
         policies=dict(
             type='list',
+            required=False
+        ),
+        superordinate=dict(
+            type='str',
+            default=None,
             required=False
         ),
     )
