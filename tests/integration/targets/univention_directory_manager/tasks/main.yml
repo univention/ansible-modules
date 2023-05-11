@@ -181,3 +181,16 @@
     set_properties:
       - property: "name"
         value: "test-entry"
+
+- name: "Test invalid dn"
+  univention_directory_manager:
+    module: "groups/group"
+    state: "absent"
+    dn: "tt:Test Domain Group,cn=groups,{{ base_dn.stdout }}"
+  register: "test_invalid_dn"
+  ignore_errors: true
+
+- name: "Check invalid dn"
+  ansible.builtin.assert:
+    that:
+      - "test_invalid_dn.failed"
