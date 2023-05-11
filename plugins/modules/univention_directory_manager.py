@@ -212,9 +212,8 @@ class UDMAnsibleModule():
             )
             self.ansible_params['position'] = position
         except IndexError:
-            # FIXME: invalid should be module.fail_json
             self.result['msg'] = 'Invalid parameter dn'
-            self.ansible_module.exit_json(**self.result)
+            self.ansible_module.fail_json(**self.result)
 
     def _get_object_by_property(self):
         try:
