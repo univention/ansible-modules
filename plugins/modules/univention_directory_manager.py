@@ -252,7 +252,11 @@ class UDMAnsibleModule():
     def _decode_value(self, obj, prop, value):
         if prop in obj.props._encoders:
             encoder = obj.props._encoders.get(prop)
-            value = encoder(prop).decode(value)
+            value = encoder(
+                property_name=prop,
+                connection=self.udm_module.connection,
+                api_version=self.udm_api_version,
+            ).decode(value)
         return value
 
     def _set_property(self, obj, prop, value):
