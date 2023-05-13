@@ -272,14 +272,32 @@ class UDMAnsibleModule():
                 obj_by_filter.append(obj)
         return obj_by_filter
 
+    def _encoder(self, obj, prop):
+        """
+        :params: obj : udm_obj
+        :params: prop : str
+        :returns: The _encoder class for the given prop
+        """
+        return obj.props._encoders.get(prop)(
+            property_name=prop,
+            connection=self.udm_module.connection,
+            api_version=self.udm_api_version,
+        )
+
     def _decode_value(self, obj, prop, value):
+        """
+        :returns: the decoded value
+        """
         if prop in obj.props._encoders:
-            encoder = obj.props._encoders.get(prop)
-            value = encoder(
-                property_name=prop,
-                connection=self.udm_module.connection,
-                api_version=self.udm_api_version,
-            ).decode(value)
+            value = self._encoder(obj, prop).decode(value)
+        return value
+
+    def _encode_value(self, obj, prop, value):
+        """
+        :returns: the encoded value
+        """
+        if prop in obj.props._encoders:
+            value = self._encoder(obj, prop).encode(value)
         return value
 
     def _set_property(self, obj, prop, value):
