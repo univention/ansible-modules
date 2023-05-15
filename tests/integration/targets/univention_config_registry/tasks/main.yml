@@ -9,13 +9,13 @@
 - name: "Get ansible/foo"
   ansible.builtin.command: "univention-config-registry get ansible/foo"
   register: "ansible_foo"
-  changed_when: "ansible_foo.stdout = ''"
+  changed_when: "ansible_foo.stdout == ''"
   failed_when: "'bar' not in ansible_foo.stdout"
 
 - name: "Get stats cron"
   ansible.builtin.command: "tail -2 /etc/cron.d/univention-system-stats"
   register: "sys_cron"
-  changed_when: "sys_cron.stdout = ''"
+  changed_when: "sys_cron.stdout == ''"
   failed_when: "'1 2 3 4 5' not in sys_cron.stdout"
 
 - name: "Set /etc/hosts entries"
@@ -54,3 +54,37 @@
   ansible.builtin.assert:
     that:
       - "'bar' not in ansible_foo.stdout"
+
+- name: "Try ucr set --force"
+  univention_config_registry:
+    keys:
+      ansible/foo: "force"
+      ansible/foo2: "force"
+    state: "present"
+    force: true
+
+- name: "Check ucr set --force"
+  ansible.builtin.lineinfile:
+    name: "/etc/univention/base-forced.conf"
+    line: "ansible/foo: force"
+    state: "present"
+  check_mode: true
+  register: "forced_conf"
+  failed_when: "(forced_conf is changed) or (forced_conf is failed)"
+
+- name: "Try ucr unset --force"
+  univention_config_registry:
+    keys:
+      ansible/foo: "force"
+      ansible/foo2: "force"
+    state: "absent"
+    force: true
+
+- name: "Check ucr unset --force"
+  ansible.builtin.lineinfile:
+    name: "/etc/univention/base-forced.conf"
+    line: "ansible/foo: force"
+    state: "absent"
+  check_mode: true
+  register: "forced_conf"
+  failed_when: "(forced_conf is changed) or (forced_conf is failed)"
