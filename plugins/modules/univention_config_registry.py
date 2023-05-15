@@ -42,6 +42,15 @@ options:
         type: str
         choices: [ absent, present ]
         default: present
+    force:
+        description:
+            - Set a variable as forced, like `ucr set --force`
+            - When the force option is used in setting a local variable, settings
+              adopted from the directory service and variables from the schedule level
+              are overruled and the given value for the local system fixed instead.
+        type: bool
+        default: false
+        required: false
     commit:
         description:
             - A list of destination filenames as strings to be commited.
@@ -69,6 +78,15 @@ EXAMPLES = '''
       - key: "hosts/static/{{ item }}"
         value: myhost.fqdn
     loop: [ '192.168.0.1', '192.168.1.1' ]
+
+# Overwrite ucrv with force
+- name: Overwrite set /etc/hosts entry
+  univention_config_registry:
+    kvlist:
+      - key: "hosts/static/192.168.0.1"
+        value: "my.lan"
+    state: present
+    force: true
 
 # Clear proxy configuration
 - name: Do not use a proxy
@@ -175,6 +193,8 @@ def _set_keys(keys, result, module):
         return
 
     args = ["/usr/sbin/univention-config-registry", "set"] + ["{0}={1}".format(key, keys[key]) for key in to_set]
+    if module.params["force"]:
+        args.insert(2, "--force")
     startd = datetime.datetime.now()
 
     rc, out, err = module.run_command(args)
@@ -213,6 +233,8 @@ def _unset_keys(keys, result, module):
         return
 
     args = ["/usr/sbin/univention-config-registry", "unset"] + to_unset
+    if module.params["force"]:
+        args.insert(2, "--force")
     startd = datetime.datetime.now()
 
     rc, out, err = module.run_command(args)
@@ -238,7 +260,8 @@ def run_module():
         keys=dict(type='dict', aliases=['name', 'key']),
         kvlist=dict(type='list'),
         state=dict(type='str', default='present', choices=['present', 'absent']),
-        commit=dict(type='list')
+        commit=dict(type='list'),
+        force=dict(type='bool', default=False),
     )
 
     module = AnsibleModule(
