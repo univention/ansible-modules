@@ -23,6 +23,7 @@ Parameter | Defaults | Comments
 --- | --- | ---
 keys (dictionary) | | A dict of keys to set or unset. In case of unsetting, the values are ignored. Either this, 'kvlist' or 'commit' must be given. |
 kvlist (list) | | You pass in a list of dicts with this parameter instead of using a dict via 'keys'. Each of the dicts passed via 'kvlist' must contain the keys 'key' and 'value'. This allows the use of Jinja in the UCR keys to set/unset. Either this, 'keys' or 'commit' must be given. |
+force (bool) | false | Can set an ucr variable as forced 'ucr set --force key=value'. A variable set with force is always preferred.
 commit (list) | | A list of destination filenames as strings to be commited. Either this, 'keys' or 'kvlist' must be given."
 state (string) | "present" | Either 'present' for setting the key/value pairs given with 'keys' or 'absent' for unsetting the keys from the 'keys' dict. |
 
