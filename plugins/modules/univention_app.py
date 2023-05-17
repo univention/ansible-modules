@@ -34,10 +34,9 @@ options:
     description:
     - 'The desired state of the app / present, or absent'
     required: true
-  upgrade:
+  version:
     description:
-    - 'Upgrade the app if installed and upgradable'
-    required: false
+    - 'The desired version of the app / number or "latest" / if not specified, latest version is used'
   auth_username:
     description:
     - 'The name of the user with witch to install apps (usually domain-admin)'
@@ -67,7 +66,15 @@ EXAMPLES = '''
   univention_app:
     name: nagios
     state: present
-    upgrade: True
+    version: 2.1.0
+    auth_username: Administrator
+    auth_password: secret
+
+- name: Install nagios in specific version
+  univention_app:
+    name: nagios
+    state: present
+    version: 2.1.0
     auth_username: Administrator
     auth_password: secret
 '''
@@ -135,8 +142,6 @@ def get_apps_status():
     available_apps_list = get_app_list()
     installed_apps_list, upgradable_apps_list = get_app_info()
 
-# Global Variable needs to be refactored
-
 
 def get_app_info():
     ''' exec to get lists of installed and upgradable apps on this system '''
@@ -151,29 +156,37 @@ def get_app_info():
 # checks what version of app is currently installed
 def check_app_version(_appname):
     app_version = None
-    installed_apps_version, upgradeable_list = get_app_info()
+    installed_apps_version, _ = get_app_info()
     for app_info in installed_apps_version:
         if _appname in app_info:
             app_version = app_info.split('=')[-1]
             break
     return app_version
 
+
+# get all available app versions
+def get_available_app_versions(_appname):
+    get_versions = ansible_exec(
+        action='list-app', appname=_appname)[1]
+    available_app_versions = re.findall(
+        r'\b(\d+\.\d+\.\d+(-\d+)?)\b', get_versions)
+    return available_app_versions
+
+
 # checks if "Latest" is selected and retrieves latest app version
-
-
 def check_target_app_version(_appname, _version):
     available_app_versions = get_available_app_versions(_appname)
     if _version == 'latest':
+        # For the sort operation, hyphens are replaced to allow sorting as int
         available_app_versions.sort(
-            key=lambda s: list(map(int, s.split('.'))))
-        latest_version = available_app_versions[-1]
+            key=lambda s: list(map(int, s[0].replace('-', '.').split('.'))))
+        latest_version = available_app_versions[-1][0]
         return latest_version
     else:
         return _version
 
+
 # change from bool to list
-
-
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
     return _appname in available_apps_list and list(filter(lambda x: _appname in x, installed_apps_list))
@@ -197,22 +210,22 @@ def generate_tmp_auth_file(_data):
     return fileTemp.name
 
 
-def install_app(_appname, _authfile, _desired_version):
+def install_app(_appname, _authfile, _desired_version, _auth_username):
     ''' installs an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout '''
-    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username='Administrator', desired_update=_desired_version)
+    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version)
 
 
-def remove_app(_appname, _authfile):
+def remove_app(_appname, _authfile, _auth_username):
     ''' removes an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout'''
-    return ansible_exec(action='remove', appname=_appname, keyfile=_authfile)
+    return ansible_exec(action='remove', appname=_appname, keyfile=_authfile, username=_auth_username)
 
 
-def upgrade_app(_appname, _authfile, _desired_version):
+def upgrade_app(_appname, _authfile, _desired_version, _auth_username):
     ''' upgrades an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout'''
-    return ansible_exec(action='upgrade', appname=_appname, keyfile=_authfile, username='Administrator', desired_update=_desired_version)
+    return ansible_exec(action='upgrade', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version)
 
 
 def stall_app(_appname, _authfile):
@@ -225,16 +238,6 @@ def undo_stall_app(_appname, _authfile):
     ''' undos the stalling of an app with given name and path to auth-file, uses ansible_exec()
         and return tuple of exit-code and stdout. '''
     return ansible_exec(action='undo_stall', appname=_appname, keyfile=_authfile)
-
-# get all available app versions
-
-
-def get_available_app_versions(_appname):
-    get_versions = ansible_exec(
-        action='list-app', appname=_appname)[1]
-    available_app_versions = re.findall(
-        r'\b(\d+\.\d+\.\d+)\b', get_versions)
-    return available_app_versions
 
 
 def main():
@@ -252,11 +255,6 @@ def main():
                 type='str',
                 default='present',
                 choices=['present', 'absent']
-            ),
-            upgrade=dict(
-                type='bool',
-                required=False,
-                default=False
             ),
             stall=dict(
                 type='str',
@@ -294,15 +292,14 @@ def main():
     # gather infos and vars
     get_apps_status()
     app_status_target = module.params.get('state')  # desired state of the app
-    app_status_upgrade = module.params.get(
-        'upgrade')  # upgrade app if installed
     app_name = module.params.get('name')  # name of the app
     auth_password = module.params.get(
         'auth_password')  # password for domain-adimin
     # check states and explicitly check for presence and absence of app
+    auth_username = module.params.get(
+        'auth_username')
     app_present = check_app_present(app_name)
     app_absent = check_app_absent(app_name)
-    app_upgradeable = check_app_upgradeable(app_name)
     # desired stalling state of the app
     app_stall_target = module.params.get('stall')
     app_target_version = check_target_app_version(
@@ -320,13 +317,14 @@ def main():
         # install_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
-            _install_app = install_app(app_name, auth_file, app_target_version)
+            _install_app = install_app(
+                app_name, auth_file, app_target_version, auth_username)
             if _install_app[0] == 0:
                 module.exit_json(
                     changed=True, msg="App {} successfully installed.".format(app_name))
             else:
                 module.fail_json(
-                    msg="an error occured while installing {}".format(app_name))
+                    msg="an error occured while installing {}".format(app_target_version))
         finally:
             os.remove(auth_file)
 
@@ -353,7 +351,8 @@ def main():
                 app_version)+1:available_app_versions.index(app_target_version)+1]
             for version in versions_to_update:
                 # Update App & check if Update successfull
-                _upgrade_app = upgrade_app(app_name, auth_file, version)
+                _upgrade_app = upgrade_app(
+                    app_name, auth_file, version, auth_username)
                 if _upgrade_app[0] == 0:
                     continue
                 else:
@@ -370,7 +369,7 @@ def main():
         # remove_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
-            _remove_app = remove_app(app_name, auth_file)
+            _remove_app = remove_app(app_name, auth_file, auth_username)
             if _remove_app[0] == 0:
                 module.exit_json(
                     changed=True, msg="App {} successfully removed.".format(app_name))
