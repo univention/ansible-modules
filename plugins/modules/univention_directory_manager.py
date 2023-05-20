@@ -309,9 +309,7 @@ class UDMAnsibleModule():
 
     def _apply_options(self, obj):
         if self.ansible_params['options']:
-            obj.options = []
-            for option in self.ansible_params['options']:
-                obj.options.append(option)
+            obj.options = self.ansible_params['options']
 
     def _create_object(self):
         obj = self.udm_module.new(
