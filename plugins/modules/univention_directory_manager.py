@@ -173,6 +173,7 @@ msg:
 import traceback # noqa F401
 
 from ansible.module_utils.basic import AnsibleModule  # noqa F401
+from ansible.module_utils.common.text.converters import to_native  # noqa F401
 
 UDM_IMP_ERR = None
 try:
@@ -203,6 +204,15 @@ class UDMAnsibleModule():
         # Class
         self.ansible_module = module
         self.ansible_params = module.params
+
+    def _try_function(self, func, *args, **kwargs):
+        """Execute the given function and handle exceptions"""
+        try:
+            func(*args, **kwargs)
+        except Exception as e:
+            self.result['msg'] = to_native(e)
+            self.result['exception'] = traceback.format_exc()
+            self.ansible_module.fail_json(**self.result)
 
     def _check_univention_import_errors(self):
         if not HAS_UDM:
@@ -301,7 +311,10 @@ class UDMAnsibleModule():
         return value
 
     def _set_property(self, obj, prop, value):
-        setattr(obj.props, prop, self._decode_value(obj, prop, value))
+        self._try_function(
+            setattr,
+            obj.props, prop, self._decode_value(obj, prop, value)
+        )
 
     def _apply_policies(self, obj):
         if self.ansible_params['policies']:
@@ -325,7 +338,9 @@ class UDMAnsibleModule():
                 prop_value = attr['value']
                 self._set_property(obj, prop_name, prop_value)
         if not self.ansible_module.check_mode:
-            obj.save()
+            self._try_function(
+                obj.save
+            )
             self.changed_objects.append(obj.dn)
 
     def _modify_object(self, obj):
@@ -341,12 +356,16 @@ class UDMAnsibleModule():
                 prop_value = attr['value']
                 self._set_property(obj, prop_name, prop_value)
         if not self.ansible_module.check_mode:
-            obj.save()
+            self._try_function(
+                obj.save
+            )
             self.changed_objects.append(obj.dn)
 
     def _remove_objects(self, obj):
         if not self.ansible_module.check_mode:
-            obj.delete()
+            self._try_function(
+                obj.delete
+            )
             self.changed_objects.append(obj.dn)
 
     def run(self):
