@@ -258,3 +258,23 @@
     set_properties:
       - property: "name"
         value: "testAttribute"
+
+- name: "Create share with an option"
+  univention_directory_manager:
+    module: "shares/share"
+    state: "present"
+    options:
+      - "samba"
+    set_properties:
+      - property: "name"
+        value: "Test"
+      - property: "path"
+        value: "/home/test"
+      - property: "host"
+        value: "ansible.local"
+
+- name: "Remove share"
+  univention_directory_manager:
+    module: "shares/share"
+    state: "absent"
+    filter: "(cn=test)"
