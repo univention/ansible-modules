@@ -166,6 +166,12 @@ EXAMPLES = '''
 RETURN = '''
 meta['changed_objects']:
     description: A list of all objects that were changed.
+meta['created']:
+    description: The created object and his attributes.
+meta['removed']:
+    description: The removed object and his attributes.
+meta['modified']:
+    description: The modified object and his changed attributes.
 msg:
     description: A human-readable information about which objects were changed.
 '''
@@ -191,11 +197,18 @@ class UDMAnsibleModule():
     udm_api_version = 2
     udm_module = None
 
+    _changes = dict(
+        new={},
+        old={},
+    )
     changed_objects = []
     result = dict(
         changed=False,
         meta=dict(
             changed_objects=changed_objects,
+            created={},
+            removed={},
+            modified={},
             ),
         msg='',
     )
@@ -316,6 +329,30 @@ class UDMAnsibleModule():
             obj.props, prop, self._decode_value(obj, prop, value)
         )
 
+    def _get_obj_properties_list(self, obj):
+        return [prop for prop in dir(obj.props) if not prop.startswith(('__', '_'))]
+
+    def _get_obj_properties_as_dict(self, obj):
+        """
+        :params: obj
+        :returns: dict
+        """
+        properties_dict = {}
+        for prop in self._get_obj_properties_list(obj):
+            properties_dict[prop] = self._encode_value(obj, prop, getattr(obj.props, prop))
+        return properties_dict
+
+    def _set_changes(self, obj, dn, state):
+        """
+        :params: obj
+        :params: dn
+        :params: state ['new', 'old']
+        """
+        self._changes[state][dn] = {}
+        self._changes[state][dn]['properties'] = self._get_obj_properties_as_dict(obj)
+        self._changes[state][dn]['options'] = obj.options
+        self._changes[state][dn]['policies'] = obj.policies
+
     def _apply_policies(self, obj):
         if self.ansible_params['policies']:
             obj.policies = self.ansible_params['policies']
@@ -342,8 +379,10 @@ class UDMAnsibleModule():
                 obj.save
             )
             self.changed_objects.append(obj.dn)
+            self._set_changes(obj, obj.dn, 'new')
 
     def _modify_object(self, obj):
+        self._set_changes(obj, obj.dn, 'old')
         self._apply_options(obj)
         self._apply_policies(obj)
         if self.ansible_params['unset_properties']:
@@ -360,13 +399,56 @@ class UDMAnsibleModule():
                 obj.save
             )
             self.changed_objects.append(obj.dn)
+            self._set_changes(obj, obj.dn, 'new')
 
     def _remove_objects(self, obj):
+        self._set_changes(obj, obj.dn, 'old')
         if not self.ansible_module.check_mode:
             self._try_function(
                 obj.delete
             )
             self.changed_objects.append(obj.dn)
+
+    def _detect_changes(self):
+        _old = self._changes['old']
+        _new = self._changes['new']
+        _diff = {}
+        if _new and not _old:
+            # obj created
+            self.result['meta']['created'] = _new
+            self.result['msg'] = "created objects: {}".format(' '.join(self.changed_objects))
+            self.result['changed'] = True
+        elif _old and not _new:
+            # obj removed
+            self.result['meta']['removed'] = _old
+            self.result['msg'] = "removed objects: {}".format(' '.join(self.changed_objects))
+            self.result['changed'] = True
+        elif _new and _old:
+            # obj modified
+            for _obj in _new:
+                _diff[_obj] = {}
+                changed = False
+                # options
+                if _old[_obj]['options'] != _new[_obj]['options'] and _new[_obj]['options'] != ['default']:
+                    _diff[_obj]['options'] = _new[_obj]['options']
+                    changed = True
+                # policies
+                if _old[_obj]['policies'] != _new[_obj]['policies']:
+                    _diff[_obj]['policies'] = _new[_obj]['policies']
+                    changed = True
+                # properties
+                if _old[_obj]['properties'] != _new[_obj]['properties']:
+                    _diff[_obj]['properties'] = {}
+                    for prop in _new[_obj]['properties']:
+                        if _old[_obj]['properties'][prop] != _new[_obj]['properties'][prop]:
+                            _diff[_obj]['properties'][prop] = _new[_obj]['properties'][prop]
+                            changed = True
+            if changed:
+                self.result['meta']['modified'] = _diff
+                self.result['msg'] = "modified objects: {}".format(' '.join(self.changed_objects))
+                self.result['changed'] = True
+        if not self.result['changed']:
+            self.result['msg'] = "nothing changed"
 
     def run(self):
         # univention module
@@ -387,7 +469,8 @@ class UDMAnsibleModule():
         elif self.ansible_params['state'] == 'absent':
             for obj in udm_objects:
                 self._remove_objects(obj)
-        self.result['msg'] = 'changed objects: %s' " ".join(self.changed_objects)
+        if not self.ansible_module.check_mode:
+            self._detect_changes()
         self.ansible_module.exit_json(**self.result)
 
 
