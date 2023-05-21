@@ -88,10 +88,8 @@
     module: "groups/group"
     state: "absent"
     dn: "cn=Test Domain Group,cn=groups,{{ base_dn.stdout }}"
-    policies:
-      - "cn=default-umc-users,cn=UMC,cn=policies,{{ base_dn.stdout }}"
 
-- name: "Check existing Object don't return traceback"
+- name: "Check existing Object don't return traceback and does not change"
   univention_directory_manager:
     module: "portals/category"
     state: "present"
@@ -106,6 +104,9 @@
         value:
           - "cn=login-ucs,cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
           - "cn=login-saml,cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
+  register: "existing"
+  failed_when:
+    - "existing.changed"
 
 - name: "Python2 - Create a portal_entry with binary attr"
   vars:
@@ -238,6 +239,7 @@
         value: "customAttributeGroups"
       - property: "ldapMapping"
         value: "customAttributeTestAttribute"
+  ignore_errors: "{{ ansible_check_mode }}"
 
 - name: "Remove an extended attribute"
   univention_directory_manager:
