@@ -116,7 +116,7 @@
     position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
     set_properties:
       - property: "name"
-        value: "test-entry"
+        value: "test-entry-py2"
       - property: "target"
         value: "foo"
       - property: "backgroundColor"
@@ -149,17 +149,8 @@
           MCwxLDU1LjgzLDMyWiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTM3Ljc0LDIwLjg4LDM1LDE0
           Ljc3Yy0uNDYsMS42NS0uNiwyLjM4LS42NiwyLjYxbC0yLTJhMzUuMTQsMzUuMTQsMCwwLDEsLjY1
           LTMuNzdjLjI2LTEuMTgsMS4zNS00Ljc2LDEuMzUtNC43Nmw5LjIxLDE5LjYxWiIvPjwvc3ZnPg==
-
-- name: "Python2 - Remove a portal_entry with binary attr"
-  vars:
-    ansible_python_interpreter: "/usr/bin/python2"
-  univention_directory_manager:
-    module: "portals/entry"
-    state: "absent"
-    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
-    set_properties:
-      - property: "name"
-        value: "test-entry"
+  when:
+    - "ansible_python_interpreter.endswith('python2')"
 
 - name: "Python3 - Create a portal_entry with binary attr"
   vars:
@@ -170,7 +161,7 @@
     position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
     set_properties:
       - property: "name"
-        value: "test-entry"
+        value: "test-entry-py3"
       - property: "target"
         value: "foo"
       - property: "backgroundColor"
@@ -206,17 +197,14 @@
           MCwxLDU1LjgzLDMyWiIvPjxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTM3Ljc0LDIwLjg4LDM1LDE0
           Ljc3Yy0uNDYsMS42NS0uNiwyLjM4LS42NiwyLjYxbC0yLTJhMzUuMTQsMzUuMTQsMCwwLDEsLjY1
           LTMuNzdjLjI2LTEuMTgsMS4zNS00Ljc2LDEuMzUtNC43Nmw5LjIxLDE5LjYxWiIvPjwvc3ZnPg==
+  when:
+    - "ansible_python_interpreter.endswith('python3')"
 
-- name: "Python3 - Remove a portal_entry with binary attr"
-  vars:
-    ansible_python_interpreter: "/usr/bin/python3"
+- name: "Remove a portal_entry with binary attr"
   univention_directory_manager:
     module: "portals/entry"
     state: "absent"
-    position: "cn=entry,cn=portals,cn=univention,{{ base_dn.stdout }}"
-    set_properties:
-      - property: "name"
-        value: "test-entry"
+    filter: "(cn=test-entry*)"
 
 - name: "Test invalid dn"
   univention_directory_manager:
