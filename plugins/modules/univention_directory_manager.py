@@ -15,7 +15,7 @@ ANSIBLE_METADATA = {
     'supported_by': 'comunity'
 }
 
-DOCUMENTATION = '''
+DOCUMENTATION = r'''
 ---
 module: univention_directory_manager
 
@@ -78,7 +78,7 @@ author:
     - Jan-Luca Kiok
 '''
 
-EXAMPLES = '''
+EXAMPLES = r'''
 # create a new user object
 - name: create a user
   univention_directory_manager:
@@ -163,7 +163,7 @@ EXAMPLES = '''
         value: 'does not matter'
 '''
 
-RETURN = '''
+RETURN = r'''
 meta['changed_objects']:
     description: A list of all objects that were changed.
 meta['created']:
