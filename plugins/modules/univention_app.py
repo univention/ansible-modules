@@ -62,11 +62,18 @@ EXAMPLES = '''
     auth_username: Administrator
     auth_password: secret
 
+- name: stop nagios
+  univention_app:
+    name: nagios
+    state: stopped
+    auth_username: Administrator
+    auth_password: secret
+
 - name: upgrade nagios
   univention_app:
     name: nagios
     state: present
-    version: 2.1.0
+    version: 2.1.1
     auth_username: Administrator
     auth_password: secret
 
@@ -115,6 +122,12 @@ def ansible_exec(action, appname=None, keyfile=None, username=None, desired_upda
                    .format(action, username, keyfile, appname)),
         'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={}"
                     .format(action, username, keyfile, appname, desired_update)),
+        'status': ("univention-app {} {}"
+                   .format(action, appname)),
+        'start': ("univention-app start {}"
+                  .format(appname)),
+        'stop': ("univention-app stop {}"
+                 .format(appname)),
         'stall': "univention-app {} {}".format(action, appname),
         'undo_stall': "univention-app {} {} --undo".format(action, appname),
     }
@@ -164,29 +177,47 @@ def check_app_version(_appname):
     return app_version
 
 
-# get all available app versions
-def get_available_app_versions(_appname):
-    get_versions = ansible_exec(
-        action='list-app', appname=_appname)[1]
+def get_and_sort_versions(_appname):
+    def replace_multiple(_available_versions, _replacements):
+        for k, v in _replacements.items():
+            _available_versions = _available_versions.replace(k, v)
+        return _available_versions
+
+    get_versions = ansible_exec(action='list-app', appname=_appname)[1]
     available_app_versions = re.findall(
-        r'\b(\d+\.\d+\.\d+(-\d+)?)\b', get_versions)
+        r'\b(\d+\.\d+\.\d+(?:\.\d+)?(?:-\d+)?(?:-\D+\d+)?(?:\s*v\d+)?)\b', get_versions)
+
+    replacements = {" ": ".", "v": ".", "-ucs": ".", "-": "."}
+    available_app_versions.sort(
+        key=lambda s: list(map(int, replace_multiple(s[0], replacements).split('.'))))
     return available_app_versions
 
 
-# checks if "Latest" is selected and retrieves latest app version
 def check_target_app_version(_appname, _version):
-    available_app_versions = get_available_app_versions(_appname)
-    if _version == 'latest':
-        # For the sort operation, hyphens are replaced to allow sorting as int
-        available_app_versions.sort(
-            key=lambda s: list(map(int, s[0].replace('-', '.').split('.'))))
+    if _version == 'current':
+        if check_app_present(_appname):
+            return check_app_version(_appname)
+        elif check_app_absent(_appname):
+            _version = 'latest'
+
+    if _version == 'latest' or _version == 'current':
+        available_app_versions = get_and_sort_versions(_appname)
         latest_version = available_app_versions[-1][0]
         return latest_version
+    return _version
+
+
+# check if app status is started or stopped
+def check_app_status(_appname):
+    app_status = ansible_exec(action='status', appname=_appname)[1]
+    if 'Active: active' in app_status:
+        return 'started'
+    elif 'Active: inactive' in app_status:
+        return 'stopped'
     else:
-        return _version
+        return 'unknown'
 
 
-# change from bool to list
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
     return _appname in available_apps_list and list(filter(lambda x: _appname in x, installed_apps_list))
@@ -208,6 +239,14 @@ def generate_tmp_auth_file(_data):
     fileTemp.write(_data)
     fileTemp.close()
     return fileTemp.name
+
+
+def start_app(_appname):
+    ansible_exec(action='start', appname=_appname)
+
+
+def stop_app(_appname):
+    ansible_exec(action='stop', appname=_appname)
 
 
 def install_app(_appname, _authfile, _desired_version, _auth_username):
@@ -254,7 +293,7 @@ def main():
             state=dict(
                 type='str',
                 default='present',
-                choices=['present', 'absent']
+                choices=['present', 'absent', 'started', 'stopped']
             ),
             stall=dict(
                 type='str',
@@ -273,7 +312,7 @@ def main():
             version=dict(
                 type='str',
                 required=False,
-                default='latest'
+                default='current'
             )
         ),
         # mutually_exclusive=[[]],
@@ -295,16 +334,15 @@ def main():
     app_name = module.params.get('name')  # name of the app
     auth_password = module.params.get(
         'auth_password')  # password for domain-adimin
-    # check states and explicitly check for presence and absence of app
     auth_username = module.params.get(
         'auth_username')
     app_present = check_app_present(app_name)
     app_absent = check_app_absent(app_name)
-    # desired stalling state of the app
     app_stall_target = module.params.get('stall')
     app_target_version = check_target_app_version(
         app_name, module.params.get('version'))
-    app_version = check_app_version(app_name)  # check App version
+    app_status = check_app_status(app_name)
+    module_changed = False
 
     # some basic logic-checks
     if not app_absent and not app_present:  # this means the app does not exist
@@ -313,40 +351,44 @@ def main():
     if app_absent and app_present:  # schroedinger's app-status
         module.fail_json(
             msg="an error occured while getting the status of {}".format(app_name))
-    if app_status_target == 'present' and not app_present:
-        # install_app(app_name)
+
+    if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
         try:
             _install_app = install_app(
                 app_name, auth_file, app_target_version, auth_username)
             if _install_app[0] == 0:
-                module.exit_json(
-                    changed=True, msg="App {} successfully installed.".format(app_name))
+                module_changed = True
             else:
                 module.fail_json(
                     msg="an error occured while installing {}".format(app_target_version))
         finally:
             os.remove(auth_file)
 
-    # logic to check App version and mheck if matched with desired version
-    if app_status_target == 'present' and app_target_version == app_version:
-        module.exit_json(
-            changed=False, msg="App {} is present in desired version. ".format(app_name))
-    # HERE MAKE SURE VERSIONS GET SORTED NUMERICALLY
-    if app_status_target == 'present' and app_target_version < app_version:
-        module.fail_json(
-            msg="The current version of {} is higher than the desired version. The version currently installed is: {}".format(app_name, app_version))
-
-    # If Desired version higher than current version = Enter update function
-
-    if app_status_target == 'present' and app_target_version > app_version:
+    elif app_status_target == 'absent' and app_present:
         auth_file = generate_tmp_auth_file(auth_password)
         try:
-            # update app & check if desired version exists
-            available_app_versions = get_available_app_versions(app_name)
-            available_app_versions.sort(
-                key=lambda s: list(map(int, s.split('.'))))
-            # check if version exists & how many versions between current and target
+            _remove_app = remove_app(app_name, auth_file, auth_username)
+            if _remove_app[0] == 0:
+                module.exit_json(
+                    changed=True, msg="App {} was successfully deinstalled.".format(app_name))
+            else:
+                module.fail_json(
+                    msg="an error occured while uninstalling {}".format(app_name))
+        finally:
+            os.remove(auth_file)
+
+    elif app_status_target == 'absent' and app_absent:
+        module.exit_json(
+            changed=False, msg="App {} not installed. No change.".format(app_name))
+
+    app_version = check_app_version(app_name)  # check App version
+
+    if app_status_target != 'absent' and app_target_version > app_version:
+        auth_file = generate_tmp_auth_file(auth_password)
+        try:
+            available_app_versions = get_and_sort_versions(app_name)
+            # check how many versions between current and target
             versions_to_update = available_app_versions[available_app_versions.index(
                 app_version)+1:available_app_versions.index(app_target_version)+1]
             for version in versions_to_update:
@@ -358,30 +400,21 @@ def main():
                 else:
                     module.fail_json(
                         msg="an error occured while upgrading {}".format(app_name))
-            _app_version = check_app_version(app_name)
-            module.exit_json(
-                changed=True, msg="App {} successfully upgraded to version {}.".format(app_name, _app_version))
-
+            module_changed = True
         finally:
             os.remove(auth_file)
 
-    elif app_status_target == 'absent' and app_present:
-        # remove_app(app_name)
-        auth_file = generate_tmp_auth_file(auth_password)
-        try:
-            _remove_app = remove_app(app_name, auth_file, auth_username)
-            if _remove_app[0] == 0:
-                module.exit_json(
-                    changed=True, msg="App {} successfully removed.".format(app_name))
-            else:
-                module.fail_json(
-                    msg="an error occured while uninstalling {}".format(app_name))
-        finally:
-            os.remove(auth_file)
+    elif app_status_target != 'absent' and app_target_version < app_version:
+        module.fail_json(
+            msg="The current version of {} is higher than the desired version. The version currently installed is: {}".format(app_name, app_version))
 
-    elif app_status_target == 'absent' and app_absent:
-        module.exit_json(
-            changed=False, msg="App {} not installed. No change.".format(app_name))
+    if app_status_target in ['started', 'stopped']:
+        if app_status_target == 'started' and app_status != 'started':
+            start_app(app_name)
+            module_changed = True
+        elif app_status_target == 'stopped' and app_status != 'stopped':
+            stop_app(app_name)
+            module_changed = True
 
     if app_present and app_stall_target == 'yes':
         # stall_app(app_name)
@@ -389,8 +422,7 @@ def main():
         try:
             _stall_app = stall_app(app_name, auth_file)
             if _stall_app[0] == 0:
-                module.exit_json(
-                    changed=True, msg="App {} successfully stalled.".format(app_name))
+                module_changed = True
             else:
                 module.fail_json(
                     msg="an error occured while stalling {}".format(app_name))
@@ -402,8 +434,7 @@ def main():
         try:
             _undo_stall_app = undo_stall_app(app_name, auth_file)
             if _undo_stall_app[0] == 0:
-                module.exit_json(
-                    changed=True, msg="App {} successfully unstalled.".format(app_name))
+                module_changed = True
             else:
                 module.fail_json(
                     msg="an error occured while undoing the stall {}".format(app_name))
@@ -413,9 +444,12 @@ def main():
         module.fail_json(
             changed=False, msg="Unrecognised target state for option stall")
 
-    else:  # just in case ...
-        module.fail_json(
-            msg="an unknown error occured while handling {}".format(app_name))
+    if module_changed:
+        module.exit_json(changed=module_changed, msg="{} is {} in version {}".format(
+            app_name, app_status_target, check_app_version(app_name)))
+    else:
+        module.exit_json(changed=module_changed, msg="No changes for {}".format(
+            app_name))
 
 
 if __name__ == '__main__':
