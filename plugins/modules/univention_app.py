@@ -110,7 +110,7 @@ def check_ucs_erratum():
     # Need to run command ucr get version
 
 
-def ansible_exec(action, appname=None, keyfile=None, username=None, desired_update=None):
+def ansible_exec(action, appname=None, keyfile=None, username=None, desired_update=None, configuration=None):
     ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
     univention_app_cmd = {
         'list': "univention-app list --ids-only",
@@ -128,6 +128,8 @@ def ansible_exec(action, appname=None, keyfile=None, username=None, desired_upda
                   .format(appname)),
         'stop': ("univention-app stop {}"
                  .format(appname)),
+        'get_configuration': "univention-app configure {} --list".format(appname),
+        'configure': "univention-app {} {} {}".format(action, appname, configuration),
         'stall': "univention-app {} {}".format(action, appname),
         'undo_stall': "univention-app {} {} --undo".format(action, appname),
     }
@@ -218,6 +220,17 @@ def check_app_status(_appname):
         return 'unknown'
 
 
+def parse_current_configuration(_config):
+    config_lines = _config.split('\n')
+    config_dict = {}
+    for line in config_lines:
+        key_value_pair = line.split(": ", 1)
+        if len(key_value_pair) == 2:
+            key, value = key_value_pair
+            config_dict[key] = value.split(' ')[0].strip("'")
+    return config_dict
+
+
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
     return _appname in available_apps_list and list(filter(lambda x: _appname in x, installed_apps_list))
@@ -279,6 +292,26 @@ def undo_stall_app(_appname, _authfile):
     return ansible_exec(action='undo_stall', appname=_appname, keyfile=_authfile)
 
 
+def get_app_configuration(_appname):
+    ''' get current app configuration, uses ansible_exec()
+        and return a dictionary with configuration parameters. '''
+    config_output = ansible_exec(
+        action='get_configuration', appname=_appname)[1]
+    current_app_configuration = parse_current_configuration(config_output)
+    return current_app_configuration
+
+
+def configure_app(_appname, _configuration):
+    ''' set app configuration, uses ansible_exec()
+        and return tuple of exit-code and stdout. '''
+    _conf_str = ""
+    if len(_configuration) > 0:
+        _conf_str = "--set "
+    for setting in _configuration:
+        _conf_str += setting + "=" + _configuration[setting] + " "
+    return ansible_exec(action='configure', appname=_appname, configuration=_conf_str)
+
+
 def main():
     ''' main() is an entry-point for ansible which checks app-status and installs,
         upgrades, or removes the app based on ansible state and name-parameters '''
@@ -313,6 +346,10 @@ def main():
                 type='str',
                 required=False,
                 default='current'
+            ),
+            config=dict(
+                type='dict',
+                required=False
             )
         ),
         # mutually_exclusive=[[]],
@@ -342,6 +379,7 @@ def main():
     app_target_version = check_target_app_version(
         app_name, module.params.get('version'))
     app_status = check_app_status(app_name)
+    app_target_config = module.params.get('config')
     module_changed = False
 
     # some basic logic-checks
@@ -354,6 +392,7 @@ def main():
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
+        # TO DO: Check for new config and apply during install
         try:
             _install_app = install_app(
                 app_name, auth_file, app_target_version, auth_username)
@@ -381,6 +420,29 @@ def main():
     elif app_status_target == 'absent' and app_absent:
         module.exit_json(
             changed=False, msg="App {} not installed. No change.".format(app_name))
+
+    if app_status_target != 'absent' and app_target_config:
+        current_config = get_app_configuration(app_name)
+        # check if input parameter exist in app
+        # TO DO: ignore lettercase for check
+        for param in app_target_config:
+            if param not in current_config:
+                module.fail_json(
+                    module_changed=True, msg="The parameter '{}' does not exist on app {}".format(param, app_name))
+        # check if params changed and set new values
+        new_params = {}
+        for param in app_target_config:
+            if current_config[param] != app_target_config[param]:
+                new_params[param] = app_target_config[param]
+        if len(new_params) > 0:
+            _configure_app = configure_app(app_name, new_params)
+            if not _configure_app[0] == 0:
+                module.fail_json(msg="An error occured while configuring {} with configuration:{}".format(
+                    app_name, new_params))
+            else:
+                module_changed = True
+                new_config_msg = '. The following configuration options were changed: {}'.format(
+                    new_params)
 
     app_version = check_app_version(app_name)  # check App version
 
@@ -445,8 +507,8 @@ def main():
             changed=False, msg="Unrecognised target state for option stall")
 
     if module_changed:
-        module.exit_json(changed=module_changed, msg="{} is {} in version {}".format(
-            app_name, app_status_target, check_app_version(app_name)))
+        module.exit_json(changed=module_changed, msg="{} is {} in version {} {}".format(
+            app_name, app_status_target, check_app_version(app_name), new_config_msg))
     else:
         module.exit_json(changed=module_changed, msg="No changes for {}".format(
             app_name))
