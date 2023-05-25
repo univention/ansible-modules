@@ -185,7 +185,7 @@ def get_and_sort_versions(_appname):
 
     get_versions = ansible_exec(action='list-app', appname=_appname)[1]
     available_app_versions = re.findall(
-        r'\b(\d+\.\d+\.\d+(?:\.\d+)?(?:-\d+)?(?:-\D+\d+)?(?:\s*v\d+)?)\b', get_versions)
+        r'\b(\d+\.\d+(?:\.\d+)*(?:-\d+)?(?:-\D+\d+)?(?:\s*v\d+)?)\b', get_versions)
 
     replacements = {" ": ".", "v": ".", "-ucs": ".", "-": "."}
     available_app_versions.sort(
@@ -202,7 +202,7 @@ def check_target_app_version(_appname, _version):
 
     if _version == 'latest':
         available_app_versions = get_and_sort_versions(_appname)
-        latest_version = available_app_versions[-1][0]
+        latest_version = available_app_versions[-1]
         return latest_version
     return _version
 
