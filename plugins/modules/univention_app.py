@@ -200,7 +200,7 @@ def check_target_app_version(_appname, _version):
         elif check_app_absent(_appname):
             _version = 'latest'
 
-    if _version == 'latest' or _version == 'current':
+    if _version == 'latest':
         available_app_versions = get_and_sort_versions(_appname)
         latest_version = available_app_versions[-1][0]
         return latest_version
