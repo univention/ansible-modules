@@ -84,6 +84,14 @@ EXAMPLES = '''
     version: 2.1.0
     auth_username: Administrator
     auth_password: secret
+- name: configure nagius
+    univention_app:
+    name: ox-connector
+    state: present
+    auth_username: Administrator
+    auth_password: univention
+    config:
+      EXAMPLE_PARAMETER : 'ExampleValue'
 '''
 
 RETURN = '''
@@ -116,8 +124,8 @@ def ansible_exec(action, appname=None, keyfile=None, username=None, desired_upda
         'list': "univention-app list --ids-only",
         'list-app': "univention-app list {}".format(appname),
         'info': "univention-app info --as-json",
-        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={}"
-                    .format(action, username, keyfile, appname, desired_update)),
+        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={} {}"
+                    .format(action, username, keyfile, appname, desired_update, configuration)),
         'remove': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
                    .format(action, username, keyfile, appname)),
         'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={}"
@@ -231,6 +239,15 @@ def parse_current_configuration(_config):
     return config_dict
 
 
+def format_new_conf(_configuration):
+    _conf_str = ""
+    if len(_configuration) > 0:
+        _conf_str = "--set "
+    for setting in _configuration:
+        _conf_str += setting + "=" + _configuration[setting] + " "
+    return _conf_str
+
+
 def check_app_present(_appname):
     ''' check if a given app is in installed_apps_list, return bool '''
     return _appname in available_apps_list and list(filter(lambda x: _appname in x, installed_apps_list))
@@ -262,10 +279,10 @@ def stop_app(_appname):
     ansible_exec(action='stop', appname=_appname)
 
 
-def install_app(_appname, _authfile, _desired_version, _auth_username):
+def install_app(_appname, _authfile, _desired_version, _auth_username, _configuration):
     ''' installs an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout '''
-    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version)
+    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version, configuration=format_new_conf(_configuration))
 
 
 def remove_app(_appname, _authfile, _auth_username):
@@ -301,15 +318,30 @@ def get_app_configuration(_appname):
     return current_app_configuration
 
 
+def check_config_and_return_differences(_current_config, _app_target_config):
+    # Create case-insensitive versions of both configs
+    current_config_lower = {k.lower(): v for k, v in _current_config.items()}
+    target_config_lower = {k.lower(): v for k, v in _app_target_config.items()}
+    # Check if input parameters exist in the app and if params changed
+    new_params = {}
+    for param in _app_target_config:
+        lower_param = param.lower()
+        if lower_param not in current_config_lower:
+            raise ValueError(
+                f"The parameter '{param}' does not exist in the app")
+        if current_config_lower[lower_param] != target_config_lower[lower_param]:
+            # Get the original key from the current_config
+            original_key = [
+                key for key in _current_config if key.lower() == lower_param][0]
+            new_params[original_key] = _app_target_config[param]
+
+    return new_params
+
+
 def configure_app(_appname, _configuration):
     ''' set app configuration, uses ansible_exec()
         and return tuple of exit-code and stdout. '''
-    _conf_str = ""
-    if len(_configuration) > 0:
-        _conf_str = "--set "
-    for setting in _configuration:
-        _conf_str += setting + "=" + _configuration[setting] + " "
-    return ansible_exec(action='configure', appname=_appname, configuration=_conf_str)
+    return ansible_exec(action='configure', appname=_appname, configuration=format_new_conf(_configuration))
 
 
 def main():
@@ -381,6 +413,8 @@ def main():
     app_status = check_app_status(app_name)
     app_target_config = module.params.get('config')
     module_changed = False
+    # User info if config settings are changed
+    new_config_msg = None
 
     # some basic logic-checks
     if not app_absent and not app_present:  # this means the app does not exist
@@ -392,12 +426,23 @@ def main():
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
-        # TO DO: Check for new config and apply during install
+        config = None
+        if app_target_config:
+            default_config = get_app_configuration(app_name)
+            try:
+                config = check_config_and_return_differences(
+                    default_config, app_target_config)
+            except ValueError as e:
+                module.fail_json(
+                    module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
         try:
             _install_app = install_app(
-                app_name, auth_file, app_target_version, auth_username)
+                app_name, auth_file, app_target_version, auth_username, config)
             if _install_app[0] == 0:
                 module_changed = True
+                if len(config) > 0:
+                    new_config_msg = '. The following configuration options were changed: {}'.format(
+                        config)
             else:
                 module.fail_json(
                     msg="an error occured while installing {}".format(app_target_version))
@@ -421,19 +466,15 @@ def main():
         module.exit_json(
             changed=False, msg="App {} not installed. No change.".format(app_name))
 
-    if app_status_target != 'absent' and app_target_config:
+    if app_status_target != 'absent' and not module_changed and app_target_config:
         current_config = get_app_configuration(app_name)
-        # check if input parameter exist in app
-        # TO DO: ignore lettercase for check
-        for param in app_target_config:
-            if param not in current_config:
-                module.fail_json(
-                    module_changed=True, msg="The parameter '{}' does not exist on app {}".format(param, app_name))
-        # check if params changed and set new values
-        new_params = {}
-        for param in app_target_config:
-            if current_config[param] != app_target_config[param]:
-                new_params[param] = app_target_config[param]
+        # check if keys exist and params changed
+        try:
+            new_params = check_config_and_return_differences(
+                current_config, app_target_config)
+        except ValueError as e:
+            module.fail_json(
+                module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
         if len(new_params) > 0:
             _configure_app = configure_app(app_name, new_params)
             if not _configure_app[0] == 0:
