@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2020, Univention GmbH
-# Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>
+# Copyright: (c) 2020-23, Univention GmbH
+# Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -45,6 +45,9 @@ options:
     description:
     - 'The password needed to install apps (usually domain-admin)'
     required: true
+  config:
+    - 'The given configuration the App should have'
+    required: false
 '''
 
 EXAMPLES = '''
@@ -84,7 +87,8 @@ EXAMPLES = '''
     version: 2.1.0
     auth_username: Administrator
     auth_password: secret
-- name: configure nagius
+
+- name: configure nagios
     univention_app:
     name: ox-connector
     state: present
@@ -264,7 +268,7 @@ def check_app_upgradeable(_appname):
 
 
 def generate_tmp_auth_file(_data):
-    ''' generate a temporaty auth-file and return path, MUST BE DELETED '''
+    ''' generate a temporary auth-file and return path, MUST BE DELETED '''
     fileTemp = tempfile.NamedTemporaryFile(delete=False, mode='w')
     fileTemp.write(_data)
     fileTemp.close()
@@ -328,7 +332,7 @@ def check_config_and_return_differences(_current_config, _app_target_config):
         lower_param = param.lower()
         if lower_param not in current_config_lower:
             raise ValueError(
-                f"The parameter '{param}' does not exist in the app")
+                "The parameter {} does not exist in the app".format(param))
         if current_config_lower[lower_param] != target_config_lower[lower_param]:
             # Get the original key from the current_config
             original_key = [
@@ -528,7 +532,7 @@ def main():
                 module_changed = True
             else:
                 module.fail_json(
-                    msg="an error occured while stalling {}".format(app_name))
+                    msg="an error occurred while stalling {}".format(app_name))
         finally:
             os.remove(auth_file)
     elif app_present and app_stall_target == 'no':
@@ -540,7 +544,7 @@ def main():
                 module_changed = True
             else:
                 module.fail_json(
-                    msg="an error occured while undoing the stall {}".format(app_name))
+                    msg="an error occurred while undoing the stall {}".format(app_name))
         finally:
             os.remove(auth_file)
     elif app_present and app_stall_target and app_stall_target not in ['yes', 'no']:
