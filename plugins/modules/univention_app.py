@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright: (c) 2020-23, Univention GmbH
-# Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>
+# Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>, Tim Breidenbach <breidenbach@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -430,7 +430,7 @@ def main():
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
-        config = None
+        config = {}
         if app_target_config:
             default_config = get_app_configuration(app_name)
             try:
