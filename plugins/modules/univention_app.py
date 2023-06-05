@@ -98,7 +98,7 @@ EXAMPLES = '''
     state: present
     auth_username: Administrator
     auth_password: univention
-    stall: "yes"
+    stall: "stalled"
 '''
 
 RETURN = '''
@@ -363,9 +363,9 @@ def main():
                 choices=['present', 'absent', 'started', 'stopped']
             ),
             stall=dict(
-                type='bool',
+                type='str',
                 required=False,
-                choices=[True, False]
+                choices=["stalled", "unstalled"]
             ),
             auth_password=dict(
                 type="str",
@@ -521,7 +521,7 @@ def main():
             stop_app(app_name)
             module_changed = True
 
-    if app_present and app_stall_target:
+    if app_present and app_stall_target == 'stalled':
         # stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
@@ -533,7 +533,7 @@ def main():
                     msg="an error occurred while stalling {}".format(app_name))
         finally:
             os.remove(auth_file)
-    elif app_present and app_stall_target:
+    elif app_present and app_stall_target == 'unstalled':
         # undo_stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
@@ -545,9 +545,6 @@ def main():
                     msg="an error occurred while undoing the stall {}".format(app_name))
         finally:
             os.remove(auth_file)
-    elif app_present and app_stall_target and app_stall_target not in ['yes', 'no']:
-        module.fail_json(
-            changed=False, msg="Unrecognised target state for option stall")
 
     if module_changed:
         module.exit_json(changed=module_changed, msg="{} is {} in version {} {}".format(

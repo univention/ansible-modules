@@ -58,7 +58,7 @@
     state: present
     auth_username: Administrator
     auth_password: univention
-    stall: "yes"
+    stall: "stalled"
 
 # unstall App
 - name: stall ox-connector
@@ -67,7 +67,7 @@
     state: present
     auth_username: Administrator
     auth_password: univention
-    stall: "no"
+    stall: "unstalled"
 
 # Deinstall App
 - name: uninstall ox-connector
