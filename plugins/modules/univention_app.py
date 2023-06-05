@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2020-23, Univention GmbH
+# Copyright: (c) 2020-2023, Univention GmbH
 # Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>, Tim Breidenbach <breidenbach@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
@@ -20,11 +20,11 @@ version_added: "0.1.3"
 short_description: "Installs and removes apps on Univention Corporate Server"
 extends_documentation_fragment: ''
 description:
-  - Allows ansible to control installation, removal and update of ucs-apps
+  - Allows ansible to control installation, removal, update and configuration of ucs-apps
 notes:
   - none
 requirements: [ ]
-author: Stefan Ahrens
+author: Stefan Ahrens, Melf Clausen
 options:
   name:
     description:
@@ -32,11 +32,11 @@ options:
     required: true
   state:
     description:
-    - 'The desired state of the app / present, or absent'
+    - 'The desired state of the app / present, absent, started, stopped'
     required: true
   version:
     description:
-    - 'The desired version of the app / number or "latest" / if not specified, latest version is used'
+    - 'The desired version of the app / number or "latest" / if not specified, current version is preserved if app present, latest installed if app absent / downgrade will throw error'
   auth_username:
     description:
     - 'The name of the user with witch to install apps (usually domain-admin)'
@@ -48,54 +48,57 @@ options:
   config:
     - 'The given configuration the App should have'
     required: false
+  stall:
+    - 'Whether an App should be stalled or unstalled'
+    required: false
 '''
 
 EXAMPLES = '''
-- name: Install nagios
+- name: Install ox-connector
   univention_app:
-    name: nagios
+    name: ox-connector
     state: present
     auth_username: Administrator
     auth_password: secret
 
-- name: remove nagios
+- name: remove ox-connector
   univention_app:
-    name: nagios
+    name: ox-connector
     state: absent
     auth_username: Administrator
     auth_password: secret
 
-- name: stop nagios
+- name: stop ox-connector
   univention_app:
-    name: nagios
+    name: ox-connector
     state: stopped
     auth_username: Administrator
     auth_password: secret
 
-- name: upgrade nagios
+- name: upgrade ox-connector or install in specified version
   univention_app:
-    name: nagios
+    name: ox-connector
     state: present
     version: 2.1.1
     auth_username: Administrator
     auth_password: secret
 
-- name: Install nagios in specific version
-  univention_app:
-    name: nagios
-    state: present
-    version: 2.1.0
-    auth_username: Administrator
-    auth_password: secret
-
-- name: configure nagios
+- name: configure ox-connector
     univention_app:
     name: ox-connector
     state: present
     auth_username: Administrator
     auth_password: univention
     config:
-      EXAMPLE_PARAMETER : 'ExampleValue'
+      EXAMPLE_PARAMETER: 'ExampleValue'
+
+- name: stall ox-connector
+    univention_app:
+    name: ox-connector
+    state: present
+    auth_username: Administrator
+    auth_password: univention
+    stall: "yes"
 '''
 
 RETURN = '''
@@ -115,11 +118,6 @@ changed:
 def check_ucs():
     ''' Check if system is actually UCS, return bool '''
     return os.system("dpkg -s univention-appcenter") == 0
-
-
-def check_ucs_erratum():
-    '''Check if UCS Version is at least 5.0'''
-    # Need to run command ucr get version
 
 
 def ansible_exec(action, appname=None, keyfile=None, username=None, desired_update=None, configuration=None):
@@ -143,7 +141,7 @@ def ansible_exec(action, appname=None, keyfile=None, username=None, desired_upda
         'get_configuration': "univention-app configure {} --list".format(appname),
         'configure': "univention-app {} {} {}".format(action, appname, configuration),
         'stall': "univention-app {} {}".format(action, appname),
-        'undo_stall': "univention-app {} {} --undo".format(action, appname),
+        'undo_stall': "univention-app stall {} --undo".format(appname),
     }
     return module.run_command(univention_app_cmd[action])
 
@@ -163,11 +161,11 @@ def get_apps_status():
             module.fail_json(msg="unable to parse json: {}".format(e))
         return app_infos['installed'], app_infos['upgradable']
 
-    global available_apps_list
-    global installed_apps_list
-    global upgradable_apps_list
-    available_apps_list = get_app_list()
-    installed_apps_list, upgradable_apps_list = get_app_info()
+    global AVAILABLE_APPS_LIST
+    global INSTALLED_APPS_LIST
+    global UPGRADABLE_APPS_LIST
+    AVAILABLE_APPS_LIST = get_app_list()
+    INSTALLED_APPS_LIST, UPGRADABLE_APPS_LIST = get_app_info()
 
 
 def get_app_info():
@@ -203,7 +201,7 @@ def get_and_sort_versions(_appname):
 
     replacements = {" ": ".", "v": ".", "-ucs": ".", "-": "."}
     available_app_versions.sort(
-        key=lambda s: list(map(int, replace_multiple(s[0], replacements).split('.'))))
+        key=lambda s: list(map(int, replace_multiple(s, replacements).split('.'))))
     return available_app_versions
 
 
@@ -253,18 +251,18 @@ def format_new_conf(_configuration):
 
 
 def check_app_present(_appname):
-    ''' check if a given app is in installed_apps_list, return bool '''
-    return _appname in available_apps_list and list(filter(lambda x: _appname in x, installed_apps_list))
+    ''' check if a given app is in INSTALLED_APPS_LIST, return bool '''
+    return _appname in AVAILABLE_APPS_LIST and list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
 
 
 def check_app_absent(_appname):
-    ''' check if a given app is NOT in installed_apps_list, return bool '''
-    return _appname in available_apps_list and not list(filter(lambda x: _appname in x, installed_apps_list))
+    ''' check if a given app is NOT in INSTALLED_APPS_LIST, return bool '''
+    return _appname in AVAILABLE_APPS_LIST and not list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
 
 
 def check_app_upgradeable(_appname):
-    ''' check if a given app is in upgradable_apps_list, return bool '''
-    return _appname in available_apps_list and bool(filter(lambda x: _appname in x, upgradable_apps_list))
+    ''' check if a given app is in UPGRADABLE_APPS_LIST, return bool '''
+    return _appname in AVAILABLE_APPS_LIST and bool(filter(lambda x: _appname in x, UPGRADABLE_APPS_LIST))
 
 
 def generate_tmp_auth_file(_data):
@@ -365,9 +363,9 @@ def main():
                 choices=['present', 'absent', 'started', 'stopped']
             ),
             stall=dict(
-                type='str',
+                type='bool',
                 required=False,
-                choices=['yes', 'no']
+                choices=[True, False]
             ),
             auth_password=dict(
                 type="str",
@@ -423,7 +421,7 @@ def main():
     # some basic logic-checks
     if not app_absent and not app_present:  # this means the app does not exist
         module.fail_json(msg=("app {} does not exist. Please choose from following options:\n{}"
-                              .format(app_name, str(available_apps_list))))
+                              .format(app_name, str(AVAILABLE_APPS_LIST))))
     if app_absent and app_present:  # schroedinger's app-status
         module.fail_json(
             msg="an error occured while getting the status of {}".format(app_name))
@@ -523,7 +521,7 @@ def main():
             stop_app(app_name)
             module_changed = True
 
-    if app_present and app_stall_target == 'yes':
+    if app_present and app_stall_target:
         # stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
@@ -535,7 +533,7 @@ def main():
                     msg="an error occurred while stalling {}".format(app_name))
         finally:
             os.remove(auth_file)
-    elif app_present and app_stall_target == 'no':
+    elif app_present and app_stall_target:
         # undo_stall_app(app_name)
         auth_file = generate_tmp_auth_file(auth_password)
         try:
