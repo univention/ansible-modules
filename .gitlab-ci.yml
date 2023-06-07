@@ -20,7 +20,7 @@ stages:
         VERSION=${RELEASE_VERSION};
       fi
     - sed -i "/version. \"[0-9]\.[0-9]\.[0-9]\"/s/[0-9]\.[0-9]\.[0-9]/$VERSION/" galaxy.yml
-  image: artifacts.knut.univention.de/upx/container-tooling/automation-ansible:main-41a9520a
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-ansible:main
   script:
     - ansible-galaxy collection build
     - ansible-galaxy collection publish --api-key ${ANSIBLE_GALAXY_API_KEY} univention-ucs_modules-${VERSION}.tar.gz
