@@ -32,7 +32,7 @@ stages:
   except:
     - triggers
     - tags
-  image: artifacts.knut.univention.de/upx/container-tooling/automation-semantic-release:main-41a9520a
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-semantic-release:main
   stage: prepare
   variables:
     GIT_STRATEGY: clone
@@ -52,7 +52,7 @@ lint:
   before_script:
     - rm -rf ${CI_BUILDS_DIR}/ci-tooling
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/univention/customers/dataport/deployment/ci-tooling.git ${CI_BUILDS_DIR}/ci-tooling
-  image: artifacts.knut.univention.de/upx/container-tooling/automation-linting:main-41a9520a
+  image: artifacts.knut.univention.de/upx/container-tooling/automation-linting:main
   except:
     refs:
       - triggers
