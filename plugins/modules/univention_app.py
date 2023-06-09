@@ -38,7 +38,7 @@ options:
     required: true
   version:
     description:
-    - 'The desired version of the app / number or "latest" if not specified, 
+    - 'The desired version of the app / number or "latest" if not specified,
        current version is preserved if app present, latest installed if app absent / downgrade will throw error'
   auth_username:
     description:
