@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # Copyright: (c) 2020-2023, Univention GmbH
-# Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>, Tim Breidenbach <breidenbach@univention.de>
+# Written by Lukas Zumvorde <zumvorde@univention.de>,
+#  Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>, Tim Breidenbach <breidenbach@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -36,7 +37,8 @@ options:
     required: true
   version:
     description:
-    - 'The desired version of the app / number or "latest" / if not specified, current version is preserved if app present, latest installed if app absent / downgrade will throw error'
+    - 'The desired version of the app / number or "latest" if not specified, 
+       current version is preserved if app present, latest installed if app absent / downgrade will throw error'
   auth_username:
     description:
     - 'The name of the user with witch to install apps (usually domain-admin)'
@@ -120,7 +122,8 @@ def check_ucs():
     return os.system("dpkg -s univention-appcenter") == 0
 
 
-def ansible_exec(action, appname=None, keyfile=None, username=None, desired_update=None, configuration=None):
+def ansible_exec(action, appname=None, keyfile=None, username=None,
+                  desired_update=None, configuration=None):
     ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
     univention_app_cmd = {
         'list': "univention-app list --ids-only",
@@ -284,7 +287,8 @@ def stop_app(_appname):
 def install_app(_appname, _authfile, _desired_version, _auth_username, _configuration):
     ''' installs an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout '''
-    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version, configuration=format_new_conf(_configuration))
+    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username,
+                         desired_update=_desired_version, configuration=format_new_conf(_configuration))
 
 
 def remove_app(_appname, _authfile, _auth_username):
@@ -296,7 +300,8 @@ def remove_app(_appname, _authfile, _auth_username):
 def upgrade_app(_appname, _authfile, _desired_version, _auth_username):
     ''' upgrades an app with given name and path to auth-file, uses ansible_exec()
         and returns tuple of exit-code and stdout'''
-    return ansible_exec(action='upgrade', appname=_appname, keyfile=_authfile, username=_auth_username, desired_update=_desired_version)
+    return ansible_exec(action='upgrade', appname=_appname, keyfile=_authfile,
+                         username=_auth_username, desired_update=_desired_version)
 
 
 def stall_app(_appname, _authfile):
@@ -511,7 +516,8 @@ def main():
 
     elif app_status_target != 'absent' and app_target_version < app_version:
         module.fail_json(
-            msg="The current version of {} is higher than the desired version. The version currently installed is: {}".format(app_name, app_version))
+            msg="""The current version of {} is higher than the desired version.
+              The version currently installed is: {}""".format(app_name, app_version))
 
     if app_status_target in ['started', 'stopped']:
         if app_status_target == 'started' and app_status != 'started':

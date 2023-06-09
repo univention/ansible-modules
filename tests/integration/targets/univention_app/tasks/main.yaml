@@ -1,8 +1,4 @@
 ---
-- name: "Facts"
-  ansible.builtin.set_fact:
-    upgrade_app_updates: "false"
-
 # Install with specific version and config parameter
 - name: "Install & configure ox-connector"
   univention_app:
