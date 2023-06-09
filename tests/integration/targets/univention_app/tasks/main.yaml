@@ -8,7 +8,7 @@
   univention_app:
     name: "ox-connector"
     state: "present"
-    version: 2.1.0
+    version: "2.1.0"
     auth_username: "Administrator"
     auth_password: "univention"
     config:
@@ -19,7 +19,7 @@
   univention_app:
     name: "ox-connector"
     state: "present"
-    version: 2.1.3
+    version: "2.1.3"
     auth_username: "Administrator"
     auth_password: "univention"
 
