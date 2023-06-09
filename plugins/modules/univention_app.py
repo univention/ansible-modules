@@ -124,7 +124,7 @@ def check_ucs():
 
 
 def ansible_exec(action, appname=None, keyfile=None, username=None,
-                desired_update=None, configuration=None):
+                 desired_update=None, configuration=None):
     ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
     univention_app_cmd = {
         'list': "univention-app list --ids-only",
