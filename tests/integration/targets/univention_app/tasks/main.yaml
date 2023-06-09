@@ -1,78 +1,78 @@
 ---
-- name: "facts"
-  set_fact:
+- name: "Facts"
+  ansible.builtin.set_fact:
     upgrade_app_updates: "false"
 
 # Install with specific version and config parameter
-- name: install & configure ox-connector
+- name: "Install & configure ox-connector"
   univention_app:
-    name: ox-connector
-    state: present
+    name: "ox-connector"
+    state: "present"
     version: 2.1.0
-    auth_username: Administrator
-    auth_password: univention
+    auth_username: "Administrator"
+    auth_password: "univention"
     config:
       ox_SOAP_SERVER: "Test"
 
 # Upgrade to specific version
-- name: upgrade ox-connector
+- name: "Upgrade ox-connector"
   univention_app:
-    name: ox-connector
-    state: present
+    name: "ox-connector"
+    state: "present"
     version: 2.1.3
-    auth_username: Administrator
-    auth_password: univention
+    auth_username: "Administrator"
+    auth_password: "univention"
 
 # change config Params
-- name: configure ox-connector
+- name: "Configure ox-connector"
   univention_app:
-    name: ox-connector
-    state: present
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
     config:
       ox_SOAP_SERVER: "TestTest"
 
 # No changes when Config Params are identical
-- name: configure ox-connector no changes
+- name: "Configure ox-connector no changes"
   univention_app:
-    name: ox-connector
-    state: present
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
     config:
       ox_SOAP_SERVER: "TestTest"
 
 # Stop App
-- name: stop ox-connector
+- name: "Stop ox-connector"
   univention_app:
-    name: ox-connector
-    state: stopped
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "stopped"
+    auth_username: "Administrator"
+    auth_password: "univention"
 
 # Stall App
-- name: stall ox-connector
+- name: "Stall ox-connector"
   univention_app:
-    name: ox-connector
-    state: present
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
     stall: "stalled"
 
 # unstall App
-- name: stall ox-connector
+- name: "Unstall ox-connector"
   univention_app:
-    name: ox-connector
-    state: present
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
     stall: "unstalled"
 
 # Deinstall App
-- name: uninstall ox-connector
+- name: "Uninstall ox-connector"
   univention_app:
-    name: ox-connector
-    state: absent
-    auth_username: Administrator
-    auth_password: univention
+    name: "ox-connector"
+    state: "absent"
+    auth_username: "Administrator"
+    auth_password: "univention"
