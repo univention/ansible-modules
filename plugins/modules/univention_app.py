@@ -421,6 +421,7 @@ def main():
     app_status = check_app_status(app_name)
     app_target_config = module.params.get('config')
     module_changed = False
+    config_changed = False
     # User info if config settings are changed
     new_config_msg = None
 
@@ -443,6 +444,7 @@ def main():
             except ValueError as e:
                 module.fail_json(
                     module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
+
         try:
             _install_app = install_app(
                 app_name, auth_file, app_target_version, auth_username, config)
@@ -451,6 +453,7 @@ def main():
                 if len(config) > 0:
                     new_config_msg = '. The following configuration options were changed: {}'.format(
                         config)
+                    config_changed = True
             else:
                 module.fail_json(
                     msg="an error occured while installing {}".format(app_target_version))
@@ -474,25 +477,6 @@ def main():
         module.exit_json(
             changed=False, msg="App {} not installed. No change.".format(app_name))
 
-    if app_status_target != 'absent' and not module_changed and app_target_config:
-        current_config = get_app_configuration(app_name)
-        # check if keys exist and params changed
-        try:
-            new_params = check_config_and_return_differences(
-                current_config, app_target_config)
-        except ValueError as e:
-            module.fail_json(
-                module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
-        if len(new_params) > 0:
-            _configure_app = configure_app(app_name, new_params)
-            if not _configure_app[0] == 0:
-                module.fail_json(msg="An error occured while configuring {} with configuration:{}".format(
-                    app_name, new_params))
-            else:
-                module_changed = True
-                new_config_msg = '. The following configuration options were changed: {}'.format(
-                    new_params)
-
     app_version = check_app_version(app_name)  # check App version
 
     if app_status_target != 'absent' and app_target_version > app_version:
@@ -514,6 +498,25 @@ def main():
             module_changed = True
         finally:
             os.remove(auth_file)
+
+    if app_status_target != 'absent' and not config_changed and app_target_config:
+        current_config = get_app_configuration(app_name)
+        # check if keys exist and params changed
+        try:
+            new_params = check_config_and_return_differences(
+                current_config, app_target_config)
+        except ValueError as e:
+            module.fail_json(
+                module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
+        if len(new_params) > 0:
+            _configure_app = configure_app(app_name, new_params)
+            if not _configure_app[0] == 0:
+                module.fail_json(msg="An error occured while configuring {} with configuration:{}".format(
+                    app_name, new_params))
+            else:
+                module_changed = True
+                new_config_msg = '. The following configuration options were changed: {}'.format(
+                    new_params)
 
     elif app_status_target != 'absent' and app_target_version < app_version:
         module.fail_json(
