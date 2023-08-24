@@ -249,8 +249,11 @@ def format_new_conf(_configuration):
     _conf_str = ""
     if len(_configuration) > 0:
         _conf_str = "--set "
-    for setting in _configuration:
-        _conf_str += setting + "=" + _configuration[setting] + " "
+        for setting, value in _configuration.items():
+            if value == "" or ' ' in value:
+                _conf_str += '{}="{}" '.format(setting, value)
+            else:
+                _conf_str += '{}={} '.format(setting, value)
     return _conf_str
 
 
