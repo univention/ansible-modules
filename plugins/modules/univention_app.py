@@ -54,6 +54,12 @@ options:
   stall:
     - 'Whether an App should be stalled or unstalled'
     required: false
+  update_app_lists:
+    description:
+    - 'Updates the list of apps and their versions - Only runs when app is installed or updated'
+    required: false
+    default: True
+
 '''
 
 EXAMPLES = '''
@@ -128,6 +134,7 @@ def ansible_exec(action, appname=None, keyfile=None, username=None,
     ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
     univention_app_cmd = {
         'list': "univention-app list --ids-only",
+        'update_app_lists': "univention-app update",
         'list-app': "univention-app list {}".format(appname),
         'info': "univention-app info --as-json",
         'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={} {}"
@@ -280,6 +287,10 @@ def generate_tmp_auth_file(_data):
     return fileTemp.name
 
 
+def update_app_lists():
+    return ansible_exec(action='update_app_lists')
+
+
 def start_app(_appname):
     ansible_exec(action='start', appname=_appname)
 
@@ -393,6 +404,11 @@ def main():
             config=dict(
                 type='dict',
                 required=False
+            ),
+            update_app_lists=dict(
+                type='bool',
+                default=True,
+                required=False
             )
         ),
         # mutually_exclusive=[[]],
@@ -402,12 +418,22 @@ def main():
 
     # This module should only run on UCS-systems
     if not check_ucs():
-        changed = False
         return module.exit_json(
-            changed=changed,
+            changed=True,
             msg='Non-UCS-system detected. Nothing to do here.'
         )
+    # update app lists
+    def update_lists():
 
+        if module.params.get('update_app_lists'):
+            _update_lists = update_app_lists()
+            if _update_lists[0] != 0:
+                return module.fail_json(
+                        msg='''
+                        An Error occured running univention-app update. 
+                        To disable updating app lists set "update_app_lists" to False
+                        '''
+                        )
     # gather infos and vars
     get_apps_status()
     app_status_target = module.params.get('state')  # desired state of the app
@@ -438,6 +464,7 @@ def main():
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
+        update_lists()
         config = {}
         if app_target_config:
             default_config = get_app_configuration(app_name)
@@ -484,6 +511,7 @@ def main():
 
     if app_status_target != 'absent' and app_target_version > app_version:
         auth_file = generate_tmp_auth_file(auth_password)
+        update_lists()
         try:
             available_app_versions = get_and_sort_versions(app_name)
             # check how many versions between current and target
