@@ -422,9 +422,9 @@ def main():
             changed=True,
             msg='Non-UCS-system detected. Nothing to do here.'
         )
+    
     # update app lists
     def update_lists():
-
         if module.params.get('update_app_lists'):
             _update_lists = update_app_lists()
             if _update_lists[0] != 0:
