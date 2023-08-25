@@ -286,6 +286,7 @@ def generate_tmp_auth_file(_data):
     fileTemp.close()
     return fileTemp.name
 
+
 def update_app_lists():
     return ansible_exec(action='update_app_lists')
 
@@ -417,18 +418,21 @@ def main():
 
     # This module should only run on UCS-systems
     if not check_ucs():
-        changed = False
         return module.exit_json(
             changed=True,
             msg='Non-UCS-system detected. Nothing to do here.'
         )
-    #update app lists
+    # update app lists
     def update_lists():
+
         if module.params.get('update_app_lists'):
             _update_lists = update_app_lists()
-            if  _update_lists[0] != 0:
+            if _update_lists[0] != 0:
                 return module.fail_json(
-                        msg='An Error occured running univention-app update. To disable updating app lists set "update_app_lists" to False'
+                        msg='''
+                        An Error occured running univention-app update. 
+                        To disable updating app lists set "update_app_lists" to False
+                        '''
                         )
     # gather infos and vars
     get_apps_status()
