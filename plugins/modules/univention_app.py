@@ -422,7 +422,7 @@ def main():
             changed=True,
             msg='Non-UCS-system detected. Nothing to do here.'
         )
-    
+
     # update app lists
     def update_lists():
         if module.params.get('update_app_lists'):
@@ -430,7 +430,7 @@ def main():
             if _update_lists[0] != 0:
                 return module.fail_json(
                         msg='''
-                        An Error occured running univention-app update. 
+                        An Error occured running univention-app update.
                         To disable updating app lists set "update_app_lists" to False
                         '''
                         )
@@ -439,7 +439,7 @@ def main():
     app_status_target = module.params.get('state')  # desired state of the app
     app_name = module.params.get('name')  # name of the app
     auth_password = module.params.get(
-        'auth_password')  # password for domain-adimin
+        'auth_password')  # password for domain-admin
     auth_username = module.params.get(
         'auth_username')
     app_present = check_app_present(app_name)
