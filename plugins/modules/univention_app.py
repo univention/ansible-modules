@@ -137,11 +137,11 @@ def ansible_exec(action, appname=None, keyfile=None, username=None,
         'update_app_lists': "univention-app update",
         'list-app': "univention-app list {}".format(appname),
         'info': "univention-app info --as-json",
-        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={} {}"
+        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}='{}' {}"
                     .format(action, username, keyfile, appname, desired_update, configuration)),
         'remove': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
                    .format(action, username, keyfile, appname)),
-        'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}={}"
+        'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}='{}'"
                     .format(action, username, keyfile, appname, desired_update)),
         'status': ("univention-app {} {}"
                    .format(action, appname)),
@@ -201,18 +201,12 @@ def check_app_version(_appname):
 
 
 def get_and_sort_versions(_appname):
-    def replace_multiple(_available_versions, _replacements):
-        for k, v in _replacements.items():
-            _available_versions = _available_versions.replace(k, v)
-        return _available_versions
-
     get_versions = ansible_exec(action='list-app', appname=_appname)[1]
     available_app_versions = re.findall(
         r'\b(\d+\.\d+(?:\.\d+)*(?:-\d+)?(?:-\D+\d+)?(?:\s*v\d+)?)\b', get_versions)
 
-    replacements = {" ": ".", "v": ".", "-ucs": ".", "-": "."}
     available_app_versions.sort(
-        key=lambda s: list(map(int, replace_multiple(s, replacements).split('.'))))
+        key=lambda s: list(map(int, re.split(r'\D+', s))))
     return available_app_versions
 
 
