@@ -14,6 +14,7 @@ import os
 import json
 import tempfile
 from ansible.module_utils.basic import AnsibleModule
+from distutils.version import LooseVersion
 
 DOCUMENTATION = '''
 ---
@@ -500,10 +501,8 @@ def main():
     elif app_status_target == 'absent' and app_absent:
         module.exit_json(
             changed=False, msg="App {} not installed. No change.".format(app_name))
-
     app_version = check_app_version(app_name)  # check App version
-
-    if app_status_target != 'absent' and app_target_version > app_version:
+    if app_status_target != 'absent' and LooseVersion(app_target_version) > LooseVersion(app_version):
         auth_file = generate_tmp_auth_file(auth_password)
         update_lists()
         try:
@@ -543,7 +542,7 @@ def main():
                 new_config_msg = '. The following configuration options were changed: {}'.format(
                     new_params)
 
-    elif app_status_target != 'absent' and app_target_version < app_version:
+    elif app_status_target != 'absent' and LooseVersion(app_target_version) < LooseVersion(app_version):
         module.fail_json(
             msg="""The current version of {} is higher than the desired version.
               The version currently installed is: {}""".format(app_name, app_version))
