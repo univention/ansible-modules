@@ -27,9 +27,9 @@ This collection has been tested against following Python versions: >= 2.7 or >= 
 ### Modules
 Name | Description
 --- | ---
-[univention.ucs_modules.univention_config_registry](./docs/univention_config_registry.md)|Manage Univention Config Registry (UCR) variables
-[univention.ucs_modules.univention_directory_manager](./docs/univention_directory_manager.md)|Manage objects via Univention Directory Manager (UDM)
-[univention.ucs_modules.univention_app](./docs/univention_app.md)|Manage univention apps on UCS
+[univention.ucs_modules.univention_config_registry](https://github.com/univention/ansible-modules/blob/main/plugins/modules/univention_config_registry.py)|Manage Univention Config Registry (UCR) variables
+[univention.ucs_modules.univention_directory_manager](https://github.com/univention/ansible-modules/blob/main/plugins/modules/univention_directory_manager.py)|Manage objects via Univention Directory Manager (UDM)
+[univention.ucs_modules.univention_app](https://github.com/univention/ansible-modules/blob/main/plugins/modules/univention_app.py)|Manage univention apps on UCS
 
 ## Installing this collection
 
