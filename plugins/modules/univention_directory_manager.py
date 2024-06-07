@@ -184,6 +184,7 @@ from ansible.module_utils.common.text.converters import to_native  # noqa F401
 UDM_IMP_ERR = None
 try:
     import univention.udm
+
     HAS_UDM = True
 except ModuleNotFoundError:
     HAS_UDM = False
@@ -394,6 +395,8 @@ class UDMAnsibleModule():
                 prop_name = attr['property']
                 prop_value = attr['value']
                 self._set_property(obj, prop_name, prop_value)
+                if prop_name == "password":
+                    self._set_property(obj, "overridePWHistory", "1")
         if not self.ansible_module.check_mode:
             self._try_function(
                 obj.save
