@@ -110,7 +110,7 @@ policies (list) | | A list of policies to apply to the given object. You have to
     policies:
       - "cn=udm-license,cn=operations,cn=UMC,cn=univention,dc=example,dc=org"
       - "cn=anotherone,cn=operations,cn=UMC,cn=univention,dc=example,dc=org"
-      - 
+      -
  ```
 
 ## Return Values
