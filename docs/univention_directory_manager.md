@@ -28,6 +28,7 @@ state (string) | "present" | Either 'present' for creating of modifying the obje
 +superordinate (string) | None | When creating a new object, set its superordinate to this DN. Only affects newly created LDAP objects, this option is ingored for modifications and removals of existing entries.
 set_properties (list) | | A list of dictionaries with the keys property and value. Properties of the objects are to be set to the given values.
 unset_properties (list) | | A list of dictionaries with the key property. The listed properties of the objects are to be unset.
+policies (list) | | A list of policies to apply to the given object. You have to define all policies you expect at the users object.
 
 ## Notes
 
@@ -99,6 +100,17 @@ unset_properties (list) | | A list of dictionaries with the key property. The li
     unset_properties:
       - property: 'firstname'
         value: 'does not matter'
+
+# assign a policy
+- name: modify testuser3 - assign policy
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    policies:
+      - "cn=udm-license,cn=operations,cn=UMC,cn=univention,dc=example,dc=org"
+      - "cn=anotherone,cn=operations,cn=UMC,cn=univention,dc=example,dc=org"
+      -
  ```
 
 ## Return Values
