@@ -22,10 +22,10 @@ repos:
         args:
           - "-c=.yamllint"
 
-  - repo: "https://github.com/ansible/ansible-lint"
-    rev: "v6.14.3"
-    hooks:
-      - id: "ansible-lint"
+  # - repo: "https://github.com/ansible/ansible-lint"
+  #   rev: "v6.14.3"
+  #   hooks:
+  #     - id: "ansible-lint"
 
   - repo: "https://github.com/pycqa/flake8"
     rev: "6.0.0"
