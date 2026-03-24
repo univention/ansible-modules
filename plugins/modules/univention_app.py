@@ -514,7 +514,7 @@ def main():
                 # Update App & check if Update successfull
                 _upgrade_app = upgrade_app(
                     app_name, auth_file, version, auth_username)
-                if _upgrade_app[0] == 0:
+                if _upgrade_app[0] == 0 or _upgrade_app[0] == 1:
                     continue
                 else:
                     module.fail_json(
