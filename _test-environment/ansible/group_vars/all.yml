@@ -1,0 +1,13 @@
+---
+admin_username: "Administrator"
+admin_password: "Univention.99"
+
+domainname: "ucs.test"
+ldap_base: "{{ ['dc='] | product(domainname.split('.')) | map('join') | join(',') }}"
+pdn_IP: "{{ hostvars[groups['pdn'][0]]['inventory_hostname'] }}"
+proxy_IP: "{{ hostvars[groups['proxy'][0]]['inventory_hostname'] }}"
+# Upgrade
+upgrade_version: "5.2-99"
+update_server: "updates.software-univention.de"
+ox_master_admin: "oxAdmin"
+ox_master_password: "DasIsteEinTestPasswort1234"

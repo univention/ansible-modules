@@ -1,0 +1,459 @@
+---
+# Preparation
+- hosts: "all:!win2k19A:!win2k19B"
+  gather_facts: false
+  tasks:
+      - name: "Set customer scope"
+        ignore_errors: true
+        univention.ucs_modules.univention_config_registry:
+            keys:
+                repository/online/component/ikonos: "yes"
+                repository/online/component/ikonos/server: "https://44031:wiLRBaLu@service.software-univention.de/apt/44031/"
+                repository/online/component/ikonos/prefix: "apt/44031"
+        register: "ucr_output"
+        failed_when:
+            - "ucr_output.changed"
+            - "ucr_output.rc > 0"
+
+      - name: "Set QA scope"
+        ansible.builtin.copy:
+          content: "deb [ trusted=yes ] http://omar.knut.univention.de/build2/ ucs_5.2-0-ikonos/all/"
+          dest: "/etc/apt/sources.list.d/build2.list"
+  tags:
+      - "set_customer_scope"
+
+- hosts: "all:!win2k19A:!win2k19B"
+  gather_facts: false
+  tasks:
+      - name: "Set Configuration for Development Environment"
+        ignore_errors: true
+        univention.ucs_modules.univention_config_registry:
+            keys:
+                directory/manager/user/enable-legacy-username-format: "true"
+        register: "ucr_output"
+        failed_when:
+            - "ucr_output.changed"
+            - "ucr_output.rc > 0"
+
+# Bug 58432 -> just for internal tests
+# Errata 148 in UCS 5.2
+- hosts: "all:!win2k19A:!win2k19B"
+  gather_facts: false
+  tasks:
+      - name: "activate type checking"
+        univention.ucs_modules.univention_config_registry:
+            keys:
+              directory/mananger/type-checking/strict: "true"
+  tags:
+      - "activate_type_checking"
+
+# Bug for tests concerning uuid generation
+- hosts: "all:!win2k19A:!win2k19B"
+  gather_facts: false
+  tasks:
+      - name: "Deactivate univentionObjectIdentifierGeneration"
+        univention.ucs_modules.univention_config_registry:
+            keys:
+              directory/manager/object-identifier/autogeneration: "false"
+
+# packages from build process
+- hosts: "pdn"
+  roles:
+    - role: "tdp.provide_packages"
+      when: "PACKAGES_PATH is defined"
+      tags: "add_local_repository_from_deb_pipeline"
+
+# this is rewuired cause AD overwrites the PW
+- hosts: "pdn"
+  tasks:
+    - name: "Ensure administrator password"
+      univention.ucs_modules.univention_directory_manager:
+        module: "users/user"
+        dn: "uid={{ admin_username }},cn=users,{{ ldap_base }}"
+        set_properties:
+          - property: "password"
+            value: "{{ admin_password }}"
+          - property: "overridePWHistory"
+            value: "1"
+          - property: "overridePWLength"
+            value: "1"
+
+# Apps primary
+- hosts: "pdn"
+  become: true
+  tasks:
+      - name: "Install Apps primary"
+        univention.ucs_modules.univention_app:
+            name: "{{ app.name }}"
+            state: "{{ app.state | default('present') }}"
+            version: "{{ app.version | default('latest') }}"
+            auth_username: "Administrator"
+            auth_password: "{{ admin_password }}"
+        loop: "{{ apps }}"
+        loop_control:
+            loop_var: "app"
+  tags:
+      - "install_apps_primary"
+
+# Customer packages
+- hosts: "pdn"
+  tasks:
+      - name: "Install packages on primary"
+        ansible.builtin.include_role:
+            name: "univention.ucs_roles.univention_install"
+        vars:
+            univention_install_name: "{{ item }}"
+        loop: "{{ custom_packages }}"
+  tags:
+      - "install_custom_packages_primary"
+
+- hosts: "pdn"
+  tasks:
+      - name: "Create OXcontexts 1/2"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'oxmail/oxcontext'
+          state: 'present'
+          dn: "cn=10,cn=open-xchange,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: '10'
+            - property: 'contextid'
+              value: '10'
+      - name: "Create OXcontexts 2/2"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'oxmail/oxcontext'
+          state: 'present'
+          dn: "cn=1234,cn=open-xchange,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: '1234'
+            - property: 'contextid'
+              value: '1234'
+
+- hosts: "pdn"
+  tasks:
+      - name: "Create mail domain for AD 1"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'mail/domain'
+          state: 'present'
+          dn: "cn=ikonos.example1,cn=mail,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: 'ikonos.example1'
+
+- hosts: "pdn"
+  tasks:
+      - name: "Create mail domain for AD 2"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'mail/domain'
+          state: 'present'
+          dn: "cn=ikonos.example2,cn=mail,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: 'ikonos.example2'
+
+- hosts: "pdn"
+  tasks:
+      - name: "Create portal login entries 1/2"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'portals/entry'
+          state: 'present'
+          dn: "cn=login-ucs,cn=entry,cn=portals,cn=univention,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: 'login-ucs'
+            - property: 'linkTarget'
+              value: 'samewindow'
+            - property: 'link'
+              value: [['de_DE', '/univention/saml/?location=/univention/portal/']]
+            - property: 'icon'
+              value: "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9ImZlYXRoZXIgZmVhdGhlci1sb2ctaW4iPjxwYXRoIGQ9Ik0xNSAzaDRhMiAyIDAgMCAxIDIgMnYxNGEyIDIgMCAwIDEtMiAyaC00Ij48L3BhdGg+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTcgMTUgMTIgMTAgNyI+PC9wb2x5bGluZT48bGluZSB4MT0iMTUiIHkxPSIxMiIgeDI9IjMiIHkyPSIxMiI+PC9saW5lPjwvc3ZnPgo="
+            - property: 'displayName'
+              value: [['de_DE', 'Anmeldung']]
+            - property: 'description'
+              value: [['de_DE','Am Portal anmelden']]
+            - property: 'anonymous'
+              value: 'TRUE'
+        tags:
+          - portal_entries
+
+- hosts: "pdn"
+  tasks:
+      - name: "Create portal login entries 2/2"
+        univention.ucs_modules.univention_directory_manager:
+          module: 'portals/entry'
+          state: 'present'
+          dn: "cn=login-saml,cn=entry,cn=portals,cn=univention,{{ ldap_base }}"
+          set_properties:
+            - property: 'name'
+              value: 'login-saml'
+            - property: 'linkTarget'
+              value: 'samewindow'
+            - property: 'link'
+              value: [['de_DE', '/univention/saml/?location=/univention/portal/']]
+            - property: 'icon'
+              value: "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgY2xhc3M9ImZlYXRoZXIgZmVhdGhlci1sb2ctaW4iPjxwYXRoIGQ9Ik0xNSAzaDRhMiAyIDAgMCAxIDIgMnYxNGEyIDIgMCAwIDEtMiAyaC00Ij48L3BhdGg+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTcgMTUgMTIgMTAgNyI+PC9wb2x5bGluZT48bGluZSB4MT0iMTUiIHkxPSIxMiIgeDI9IjMiIHkyPSIxMiI+PC9saW5lPjwvc3ZnPgo="
+            - property: 'displayName'
+              value: [['de_DE', 'Anmeldung']]
+            - property: 'description'
+              value: [['de_DE','Am Portal anmelden']]
+            - property: 'anonymous'
+              value: 'TRUE'
+        tags:
+          - portal_entries
+
+# AD-C settings
+- hosts: "pdn"
+  tags:
+    - deploy_ad
+  tasks:
+    - name: "AD-C 1: get information about previous run"
+      changed_when: false
+      ansible.builtin.stat:
+        path: "/root/AD_1_promoted"
+      register: "deploy_ad_1_status"
+    - name: "AD-C 1: Install AD-C"
+      ansible.builtin.apt:
+        name: "univention-ad-connector"
+        state: present
+    - name: "get win2k19A_IP"
+      when: "(deploy_ad | default('True') | bool) == (True | bool)"
+      ansible.builtin.slurp:
+        src: "/root/win2k19A_IP"
+      register: "slurp"
+    - name: "save win2k19A_IP"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+      ansible.builtin.set_fact:
+        win2k19A_IP: "{{ slurp.content | b64decode | trim }}"  # trim replaces the newline
+    - name: "AD-C 1: winrm config"
+      ansible.builtin.shell: "source /root/utils.sh && winrm_config 'ikonos.example1' 'Univention.99' 'Administrator' '{{ win2k19A_IP }}'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 1: winrm - ip config"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd ipconfig"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+      retries: 3
+      delay: 3
+      register: result
+      until: result.rc == 0
+    - name: "AD-C 1: winrm - promote AD"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm promote-ad --forestmode WIN2016 --domainmode WIN2016"
+      register: "promoted_ad_1"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+      ignore_errors: true
+    - name:  "AD_C 1: write status file after successfull promoting AD"
+      when:
+        - "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+        - "promoted_ad_1.changed"
+      ansible.builtin.file:
+        path: "/root/AD_1_promoted"
+        state: "touch"
+        mode: "644"
+      check_mode: false
+    - name: "AD-C 1: AD create attributes 1/2"
+      ansible.builtin.command: "smbclient '\\\\{{ win2k19A_IP }}\\C$' -U Administrator%Univention.99 -c 'put Create-ADAttributes.ps1 Create-ADAttributes.ps1'"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 1: AD create attributes 2/2"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd 'powershell -file c:\\Create-ADAttributes.ps1'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 1: AD create Objects 1/2"
+      ansible.builtin.command: "smbclient '\\\\{{ win2k19A_IP }}\\C$' -U Administrator%Univention.99 -c 'put Create-ADObjects.ps1 Create-ADObjects.ps1'"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 1: AD create Objects 2/2"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd 'powershell -file c:\\Create-ADObjects.ps1'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 1: Create connector directory in /etc"
+      ansible.builtin.file:
+        path: /etc/univention/connector/ad/
+        owner: root
+        group: root
+    - name: "AD-C 1: Create AD-C password file"
+      ansible.builtin.copy:
+        dest: /etc/univention/connector/ad/bindpw
+        content: "Univention.99"
+    - name: "AD-C 1: Create Container for AD-C to sync to"
+      univention.ucs_modules.univention_directory_manager:
+        module: "container/ou"
+        dn: "ou=Finanzamt,{{ ldap_base }}"
+        state: 'present'
+        set_properties:
+          - property: "name"
+            value: "Finanzamt"
+    - name: "AD-C 1: Configure AD-C via UCR"
+      ignore_errors: true
+      univention.ucs_modules.univention_config_registry:
+        kvlist:
+          - key: "hosts/static/{{ win2k19A_IP }}"
+            value: "WIN-N8V5GD1V1VL.ikonos.example1"
+          - key: "connector/ad/ldap/base"
+            value: "DC=ikonos,DC=example1"
+          - key: "connector/ad/ldap/binddn"
+            value: "CN=Administrator,CN=Users,DC=ikonos,DC=example1"
+          - key: "connector/ad/ldap/bindpw"
+            value: "/etc/univention/connector/ad/bindpw"
+          - key: "connector/ad/ldap/port"
+            value: "389"
+          - key: "connector/ad/ldap/ssl"
+            value: "no"
+          - key: "connector/ad/ldap/host"
+            value: "WIN-N8V5GD1V1VL.ikonos.example1"
+          - key: "connector/ad/mapping/syncmode"
+            value: "read"
+          - key: "connector/ad/mapping/user/primarymail"
+            value: "true"
+          - key: "connector/ad/mapping/user/alternativemail"
+            value: "true"
+          - key: "connector/ad/mapping/kerberosdomain"
+            value: "ikonos.example1"
+          - key: "ikonos/connector/ad/destination"
+            value: "ou=Finanzamt,{{ ldap_base }}"
+      register: "ucr_output"
+      failed_when:
+        - "ucr_output.changed"
+        - "ucr_output.rc > 0"
+    - name: "AD-C 1: Restart Service"
+      ansible.builtin.systemd_service:
+        name: "univention-ad-connector"
+        state: restarted
+    - name: "AD-C 1: Assert AD-C config"
+      ansible.builtin.shell: ". utils.sh && assert_adconnector_configuration"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+- hosts: "pdn"
+  tags:
+    - never
+    - deploy_ad
+  tasks:
+    - name: "AD-C 2: Install AD-C"
+      ansible.builtin.apt:
+        name: "univention-ad-connector"
+        state: present
+    - name: "AD-C 2: get information about previous run"
+      changed_when: false
+      ansible.builtin.stat:
+        path: "/root/AD_2_promoted"
+      register: "deploy_ad_2_status"
+    - name: "get win2k19B_IP"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+      ansible.builtin.slurp:
+        src: "/root/win2k19B_IP"
+      register: "slurp"
+    - name: "save win2k19B_IP"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+      ansible.builtin.set_fact:
+        win2k19B_IP: "{{ slurp.content | b64decode | trim }}"  # trim replaces the newline
+    - name: "AD-C 2: Prepare second instance"
+      ansible.builtin.command: "/usr/share/univention-ad-connector/scripts/prepare-new-instance -a create -c connector2 -f"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+    - name: "AD-C 2: winrm config"
+      ansible.builtin.shell: ". utils.sh && winrm_config 'ikonos.example2' 'Univention.99' 'Administrator' '{{ win2k19B_IP }}'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+    - name: "AD-C 2: winrm - ip config"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd ipconfig"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+    - name: "AD-C 2: winrm - promote AD"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm promote-ad --forestmode WIN2016 --domainmode WIN2016"
+      args:
+        executable: /bin/bash
+      register: "promoted_ad_2"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+      ignore_errors: true
+    - name:  "AD_C 2: write status file after successfull promoting AD"
+      when:
+        - "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+        - "promoted_ad_2.changed"
+      ansible.builtin.file:
+        path: "/root/AD_2_promoted"
+        state: "touch"
+        mode: "644"
+      check_mode: false
+    - name: "AD-C 2: AD create attributes 1/2"
+      ansible.builtin.command: "smbclient '\\\\{{ win2k19A_IP }}\\C$' -U Administrator%Univention.99 -c 'put Create-ADAttributes.ps1 Create-ADAttributes.ps1'"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 2: AD create attributes 2/2"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd 'powershell -file c:\\Create-ADAttributes.ps1'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 2: AD create Objects 1/2"
+      ansible.builtin.command: "smbclient '\\\\{{ win2k19A_IP }}\\C$' -U Administrator%Univention.99 -c 'put Create-ADObjects.ps1 Create-ADObjects.ps1'"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 2: AD create Objects 2/2"
+      ansible.builtin.shell: ". utils.sh && ucs-winrm run-ps --cmd 'powershell -file c:\\Create-ADObjects.ps1'"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_1_status.stat.exists"
+    - name: "AD-C 2: Create connector directory in /etc"
+      ansible.builtin.file:
+        path: /etc/univention/connector2/ad/
+        owner: root
+        group: root
+    - name: "AD-C 2: Create AD-C password file"
+      ansible.builtin.copy:
+        dest: /etc/univention/connector2/ad/bindpw
+        content: "Univention.99"
+    - name: "AD-C 2: Create Container for AD-C to sync to"
+      univention.ucs_modules.univention_directory_manager:
+        module: "container/ou"
+        dn: "ou=Finanzamt2,{{ ldap_base }}"
+        state: present
+        set_properties:
+          - property: "name"
+            value: "Finanzamt2"
+    - name: "AD-C 2: Configure AD-C via UCR"
+      ignore_errors: true
+      univention.ucs_modules.univention_config_registry:
+        kvlist:
+          - key: "hosts/static/{{ win2k19B_IP }}"
+            value: "WIN-N8V5GD1V1VL.ikonos.example2"
+          - key: "connector2/ad/ldap/base"
+            value: "DC=ikonos,DC=example2"
+          - key: "connector2/ad/ldap/binddn"
+            value: "CN=Administrator,CN=Users,DC=ikonos,DC=example2"
+          - key: "connector2/ad/ldap/bindpw"
+            value: "/etc/univention/connector2/ad/bindpw"
+          - key: "connector2/ad/ldap/port"
+            value: "389"
+          - key: "connector2/ad/ldap/ssl"
+            value: "no"
+          - key: "connector2/ad/ldap/host"
+            value: "WIN-N8V5GD1V1VL.ikonos.example2"
+          - key: "connector2/ad/mapping/syncmode"
+            value: "read"
+          - key: "connector2/ad/mapping/user/primarymail"
+            value: "true"
+          - key: "connector2/ad/mapping/user/alternativemail"
+            value: "true"
+          - key: "connector2/ad/mapping/kerberosdomain"
+            value: "ikonos.example2"
+          - key: "ikonos/connector/ad/destination"
+            value: "ou=Finanzamt2,{{ ldap_base }}"
+      register: "ucr_output"
+      failed_when:
+        - "ucr_output.changed"
+        - "ucr_output.rc > 0"
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+    - name: "AD-C 2: Restart Service"
+      ansible.builtin.systemd_service:
+        name: "univention-ad-connector"
+        state: restarted
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"
+    - name: "AD-C 2: Assert AD-C config"
+      ansible.builtin.shell: ". utils.sh && assert_adconnector_configuration"
+      args:
+        executable: /bin/bash
+      when: "((deploy_ad | default('True') | bool) == (True | bool)) and not deploy_ad_2_status.stat.exists"

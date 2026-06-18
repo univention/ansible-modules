@@ -1,0 +1,36 @@
+---
+
+- hosts: pdn
+  roles:
+    - role: tdp.provide_packages
+      when: PACKAGES_PATH is defined
+
+- hosts: pdn
+  tasks:
+    - name: "Configure upgrade to ignore missing disk space"
+      ignore_errors: true
+      univention.ucs_modules.univention_config_registry:
+        keys:
+          update50/ignore_free_space: "yes"
+          update51/ignore_free_space: "yes"
+          update52/ignore_free_space: "yes"
+    - name: Run univention-upgrade
+      ansible.builtin.command:
+        cmd: univention-upgrade --ignoressh --ignoreterm --noninteractive --updateto="{{ upgrade_version }}"
+
+# Customer packages
+- hosts: "pdn"
+  tasks:
+    - name: "remove old customer packages"
+      ansible.builtin.apt:
+        state: "absent"
+        name: "{{ item }}"
+      loop: "{{ custom_packages }}"
+    - name: "Install customer packages"
+      ansible.builtin.include_role:
+          name: "univention.ucs_roles.univention_install"
+      vars:
+          univention_install_name: "{{ item }}"
+      loop: "{{ custom_packages }}"
+  tags:
+      - "install_custom_packages"

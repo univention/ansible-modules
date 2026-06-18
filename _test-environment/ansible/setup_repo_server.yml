@@ -1,0 +1,77 @@
+- hosts: repo_server
+  tasks:
+    - name: Configure repositories
+      univention.ucs_modules.univention_config_registry:
+        keys:
+          repository/online: true
+          repository/online/sources: true
+          repository/online/unmaintained: true
+          update/secure_apt: false
+      notify: update-package-cache
+
+    - name: Enforce package update
+      meta: flush_handlers
+
+    - name: Create directory to hold packages
+      ansible.builtin.file:
+        path: /var/lib/univention-repository/mirror
+        state: directory
+
+    - name: Copy packages
+      ansible.builtin.copy:
+        src: "{{ PACKAGES_PATH }}/"
+        dest: /var/lib/univention-repository/mirror
+      when: PACKAGES_PATH is defined
+
+    - name: Ensure dpkg-scanpackage is available
+      ansible.builtin.package:
+        name: dpkg-dev
+        state: present
+
+    - name: Run dpkg-scanpackages
+      ansible.builtin.shell:
+        cmd: |
+          cd /var/lib/univention-repository/mirror/
+          dpkg-scanpackages . > /var/lib/univention-repository/mirror/Packages
+          gzip -c9 /var/lib/univention-repository/mirror/Packages > /var/lib/univention-repository/mirror/Packages.gz
+        creates: /var/lib/univention-repository/mirror/Packages.gz
+
+    - name: Install univention-debmirror
+      ansible.builtin.package:
+        name: univention-debmirror
+        state: present
+
+  handlers:
+    - name: update-package-cache
+      ansible.builtin.apt:
+        update_cache: true
+
+- hosts: all
+  tasks:
+    - name: Ensure repo-server.test can be resolved
+      univention.ucs_modules.univention_config_registry:
+        kvlist:
+          - key: "hosts/static/{{ groups['repo_server'][0] }}"
+            value: "repo-server.test"
+
+    - name: Register repository as apt source
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/21_feature-build.list
+        content: |
+          deb [trusted=yes] http://repo-server.test/univention-repository/ ./
+
+      notify:
+        update-package-cache
+
+    - name: Prefer packages from repo-server.test
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/pinning
+        content: |
+          Package: *
+          Pin: origin repo-server.test
+          Pin-Priority: 900
+
+  handlers:
+    - name: update-package-cache
+      ansible.builtin.apt:
+        update_cache: true

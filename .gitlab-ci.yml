@@ -2,14 +2,34 @@ variables:
   CI_REGISTRY:
     value: "gitregistry.knut.univention.de"
     description: "URI for GitLab CI Container Registry"
+  ENV_CFG:
+    value: "${CI_PROJECT_DIR}/_test-environment/small-env.cfg"
+    description: "Path to the config file for kvm_create. Example: ${CI_PROJECT_DIR}/_test-environment/small-env.cfg"
+  TDP_VERSION:
+    value: &TDP_VERSION "v6.1.1"
+    description: "Version of the test dev pipeline. Example: v6.1.1"
+  KVM_USER:
+    value: "build"
+    description: "user to connect to KVM host. Also used to prefix the host"
+  KVM_BUILD_SERVER:
+    value: "tross.knut.univention.de"
+    description: "which KVM host?"
+  UCS_VERSION:
+    value: "5.2-5"
+    description: "Version of the UCS image"
 
 include:
   - project: univention/infrastructure/docker-services
     file:
       - pre-commit.yml
+  - project: univention/prof-services/internal/devops/test-dev-pipeline
+    ref: *TDP_VERSION
+    file:
+      - jobs-library.yml
 
 stages:
   - .pre
+  - deploy
   - prepare
   - release
   - publish
@@ -91,3 +111,47 @@ publish-mr:
     - tags
   extends: .publish-common
   when: manual
+
+
+create_vms:
+  stage: deploy
+  extends: .tdp_create_vms
+  # needed for win
+  before_script:
+    - apt update
+    - apt install --yes nmap
+    - !reference [.tdp_create_vms, before_script]
+  # This can run immediatly therefore empty needs to skip stage order
+  needs: []
+  environment:
+    name: test/${CI_COMMIT_REF_SLUG}
+    on_stop: terminate_deployment
+  artifacts:
+    when: always
+  variables:
+    # This is passed on as `kvm_extra_label` to `ucs-kvm-create`
+    JOB_BASE_NAME: "${TEST_ENV_EXTRA_LABEL}_${CI_COMMIT_REF_SLUG}"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_OPEN_MERGE_REQUESTS
+      variables:
+        HAS_BUILT_PACKAGES: "true"
+    # - if: *PUSH_TO_DEFAULT_BRANCH
+    #   when: never
+
+terminate_deployment:
+  stage: deploy
+  extends: .tdp_stop_deployment
+  environment:
+    name: test/${CI_COMMIT_REF_SLUG}
+  needs:
+    - job: create_vms
+      optional: true
+  rules:
+    # - if: *PUSH_TO_DEFAULT_BRANCH
+    #   when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_OPEN_MERGE_REQUESTS
+      when: manual
+
+# ansible-test-sanity:
+#   stage: test
+  

@@ -1,0 +1,18 @@
+- hosts: pdn
+  tasks:
+    - name: "install pytest-banchmark"
+      ansible.builtin.apt:
+          name: "pytest-benchmark"
+          state: "latest"
+    # FIXME: do this in tests
+    - name: "Configure root group for ox users"
+      univention.ucs_modules.univention_config_registry:
+          keys:
+              ikonos/groups_with_ox_enabled_users: "autocreated_testgroup-top-group"
+    - name: Run tests
+      ansible.builtin.command: "pytest-3 --tb=long --showlocals -vvv --junit-xml=/usr/share/ikonos/test/automated_test_output.xml /usr/share/ikonos/test/"
+      ignore_errors: true
+    - name: Fetch results
+      ansible.builtin.fetch:
+        src: "/usr/share/ikonos/test/automated_test_output.xml"
+        dest: "./"
