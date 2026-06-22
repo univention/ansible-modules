@@ -6,7 +6,7 @@ variables:
     value: "${CI_PROJECT_DIR}/_test-environment/small-env.cfg"
     description: "Path to the config file for kvm_create. Example: ${CI_PROJECT_DIR}/_test-environment/small-env.cfg"
   TDP_VERSION:
-    value: &TDP_VERSION "v6.1.1"
+    value: &TDP_VERSION "v8.2.0"
     description: "Version of the test dev pipeline. Example: v6.1.1"
   KVM_USER:
     value: "build"
@@ -15,7 +15,7 @@ variables:
     value: "tross.knut.univention.de"
     description: "which KVM host?"
   UCS_VERSION:
-    value: "5.2-5"
+    value: "5.2-6"
     description: "Version of the UCS image"
 
 include:
@@ -154,4 +154,4 @@ terminate_deployment:
 
 # ansible-test-sanity:
 #   stage: test
-  
+

@@ -6,43 +6,6 @@ hostname_domain: "{{ inventory_hostname | replace(inventory_hostname_short + '.'
 # Description: The systems host name.
 hostname: "{{ inventory_hostname_short }}"
 
-# Apps:
-apps:
-  - name: "self-service"
-    version: "latest"
-    state: "present"
-  - name: "ox-connector"
-    version: "latest"
-    state: "present"
-    config:
-      OX_SOAP_SERVER: "https://ox-provisioning.{{ domainname }}"
-      OX_IMAP_SERVER: "imap://127.0.0.1:143"
-      OX_SMTP_SERVER: "smtp://127.0.0.1:26"
-      DEFAULT_CONTEXT: "9999"
-      OX_LANGUAGE: "de_DE"
-      LOCAL_TIMEZONE: "Europe/Berlin"
-      OX_MASTER_ADMIN: "{{ ox_master_admin }}"
-      OX_MASTER_PASSWORD: "{{ ox_master_password }}"
-
-  # - name: "dovecot-connector"
-  #   version: "1.0.2"
-  #   state: "present"
-
 # Packages
 custom_packages:
   - "htop"
-  - "ikonos-utils"
-  - "ikonos-utils-ad"
-  - "ikonos-ad-mapping"
-  # - "ikonos-ad-mapping-cfg-prod"
-  # - "ikonos-ad-mapping-cfg-test"
-  - "ikonos-ad-mapping-tests"
-  - "ikonos-hallway-telephone"
-  - "ikonos-hallway-telephone-tests"  
-  - "ikonos-listener-modules"
-  - "ikonos-policies"
-  - "ikonos-portal"
-  - "ikonos-selfservice-uniquemail"
-  - "ikonos-selfservice-email-bodies"
-  - "ikonos-udm-hooks"
-  - "univention-directory-logger"
