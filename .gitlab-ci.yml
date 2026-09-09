@@ -154,4 +154,3 @@ terminate_deployment:
 
 # ansible-test-sanity:
 #   stage: test
-
