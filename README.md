@@ -7,7 +7,7 @@ management of Univention Corporate Server instances.
 
 ### Univention version compatibility
 
-This collection has been tested against following UCS versions: < 4.2
+This collection has been tested against following UCS versions: >= 5.0
 
 Since UCS 5.0 `ansible_python_interpreter=/usr/bin/python3` is required.
 
@@ -20,11 +20,12 @@ metadata that identifies these versions.
 
 ### Python version compatibility
 
-This collection has been tested against following Python versions: >= 2.7 or >= 3.9
+This collection has been tested against following Python versions: >= 3.9
 
 ## Included content
 
 ### Modules
+
 Name | Description
 --- | ---
 [univention.ucs_modules.univention_config_registry](./docs/univention_config_registry.md)|Manage Univention Config Registry (UCR) variables
