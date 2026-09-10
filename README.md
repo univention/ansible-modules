@@ -7,30 +7,30 @@ management of Univention Corporate Server instances.
 
 ### Univention version compatibility
 
-This collection has been tested against following UCS versions: >= 5.0
+This collection has been tested against following UCS versions: 5.0, 5.2
 
 Since UCS 5.0 `ansible_python_interpreter=/usr/bin/python3` is required.
 
 ### Ansible version compatibility
 
-This collection has been tested against following Ansible versions: >= 2.11
+This collection has been tested against following Ansible versions: 2.11-2.13
 
 Plugins and modules within a collection may be tested with only specific Ansible versions. A collection may contain
 metadata that identifies these versions.
 
 ### Python version compatibility
 
-This collection has been tested against following Python versions: >= 3.9
+This collection has been tested against following Python versions: 3.9-3.11
 
 ## Included content
 
 ### Modules
 
-Name | Description
---- | ---
-[univention.ucs_modules.univention_config_registry](./docs/univention_config_registry.md)|Manage Univention Config Registry (UCR) variables
-[univention.ucs_modules.univention_directory_manager](./docs/univention_directory_manager.md)|Manage objects via Univention Directory Manager (UDM)
-[univention.ucs_modules.univention_app](./docs/univention_app.md)|Manage univention apps on UCS
+| Name                                                                                          | Description                                           |
+|-----------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| [univention.ucs_modules.univention_config_registry](./docs/univention_config_registry.md)     | Manage Univention Config Registry (UCR) variables     |
+| [univention.ucs_modules.univention_directory_manager](./docs/univention_directory_manager.md) | Manage objects via Univention Directory Manager (UDM) |
+| [univention.ucs_modules.univention_app](./docs/univention_app.md)                             | Manage univention apps on UCS                         |
 
 ## Installing this collection
 
