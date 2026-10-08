@@ -9,14 +9,15 @@
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-import re
-import os
 import json
+import os
+import re
 import tempfile
-from ansible.module_utils.basic import AnsibleModule
 from distutils.version import LooseVersion
 
-DOCUMENTATION = '''
+from ansible.module_utils.basic import AnsibleModule
+
+DOCUMENTATION = """
 ---
 module: univention_app
 version_added: "0.1.3"
@@ -55,15 +56,18 @@ options:
   stall:
     - 'Whether an App should be stalled or unstalled'
     required: false
+  pinned:
+    - 'Whether an App should be pinned or unpinned'
+    required: false
   update_app_lists:
     description:
     - 'Updates the list of apps and their versions - Only runs when app is installed or updated'
     required: false
     default: True
 
-'''
+"""
 
-EXAMPLES = '''
+EXAMPLES = """
 - name: Install ox-connector
   univention_app:
     name: ox-connector
@@ -109,9 +113,25 @@ EXAMPLES = '''
     auth_username: Administrator
     auth_password: univention
     stall: "stalled"
-'''
 
-RETURN = '''
+- name: pin ox-connector
+    univention_app:
+    name: ox-connector
+    state: present
+    auth_username: Administrator
+    auth_password: univention
+    pinned: true
+
+- name: unpin ox-connector
+    univention_app:
+    name: ox-connector
+    state: present
+    auth_username: Administrator
+    auth_password: univention
+    pinned: false
+"""
+
+RETURN = """
 msg:
     description: a return message
     returned: success, failure
@@ -122,55 +142,70 @@ changed:
     returned: success
     type: bool
     sample: True
-'''
+"""
 
 
 def check_ucs():
-    ''' Check if system is actually UCS, return bool '''
-    return os.system("dpkg -s univention-appcenter") == 0
+    """Check if system is actually UCS, return bool"""
+    return os.system('dpkg -s univention-appcenter') == 0
 
 
-def ansible_exec(action, appname=None, keyfile=None, username=None,
-                 desired_update=None, configuration=None):
-    ''' runs ansible's run_command(), choose from actions install, remove, upgrade '''
+def ansible_exec(
+    action,
+    appname=None,
+    keyfile=None,
+    username=None,
+    desired_update=None,
+    configuration=None,
+):
+    """runs ansible's run_command(), choose from actions install, remove, upgrade"""
     univention_app_cmd = {
-        'list': "univention-app list --ids-only",
-        'update_app_lists': "univention-app update",
-        'list-app': "univention-app list {}".format(appname),
-        'info': "univention-app info --as-json",
-        'install': ("univention-app {} --noninteractive --username {} --pwdfile {} {}='{}' {}"
-                    .format(action, username, keyfile, appname, desired_update, configuration)),
-        'remove': ("univention-app {} --noninteractive --username {} --pwdfile {} {}"
-                   .format(action, username, keyfile, appname)),
-        'upgrade': ("univention-app {} --noninteractive --username {} --pwdfile {} {}='{}'"
-                    .format(action, username, keyfile, appname, desired_update)),
-        'status': ("univention-app {} {}"
-                   .format(action, appname)),
-        'start': ("univention-app start {}"
-                  .format(appname)),
-        'stop': ("univention-app stop {}"
-                 .format(appname)),
-        'get_configuration': "univention-app configure {} --list".format(appname),
-        'configure': "univention-app {} {} {}".format(action, appname, configuration),
-        'stall': "univention-app {} {}".format(action, appname),
-        'undo_stall': "univention-app stall {} --undo".format(appname),
+        'list': 'univention-app list --ids-only',
+        'update_app_lists': 'univention-app update',
+        'list-app': 'univention-app list {}'.format(appname),
+        'info': 'univention-app info --as-json',
+        'install': (
+            "univention-app {} --noninteractive --username {} --pwdfile {} {}='{}' {}".format(
+                action, username, keyfile, appname, desired_update, configuration
+            )
+        ),
+        'remove': (
+            'univention-app {} --noninteractive --username {} --pwdfile {} {}'.format(
+                action, username, keyfile, appname
+            )
+        ),
+        'upgrade': (
+            "univention-app {} --noninteractive --username {} --pwdfile {} {}='{}'".format(
+                action, username, keyfile, appname, desired_update
+            )
+        ),
+        'status': ('univention-app {} {}'.format(action, appname)),
+        'start': ('univention-app start {}'.format(appname)),
+        'stop': ('univention-app stop {}'.format(appname)),
+        'get_configuration': 'univention-app configure {} --list'.format(appname),
+        'configure': 'univention-app {} {} {}'.format(action, appname, configuration),
+        'stall': 'univention-app {} {}'.format(action, appname),
+        'undo_stall': 'univention-app stall {} --undo'.format(appname),
+        'pin': 'univention-app pin {}'.format(appname),
+        'unpin': 'univention-app pin --revert {}'.format(appname),
     }
     return module.run_command(univention_app_cmd[action])
 
 
 def get_apps_status():
-    ''' Get the status of available, installed and upgradable apps and return lists'''
+    """Get the status of available, installed and upgradable apps and return lists"""
+
     def get_app_list():
-        ''' exec to get list of all available apps on this system '''
+        """exec to get list of all available apps on this system"""
         return ansible_exec(action='list')[1]
 
     def get_app_info():
-        ''' exec to get lists of installed and upgradable apps on this system '''
+        """exec to get lists of installed and upgradable apps on this system"""
         app_info = ansible_exec(action='info')
         try:
             app_infos = json.loads(app_info[1])
         except Exception as e:
-            module.fail_json(msg="unable to parse json: {}".format(e))
+            module.fail_json(msg='unable to parse json: {}'.format(e))
         return app_infos['installed'], app_infos['upgradable']
 
     global AVAILABLE_APPS_LIST
@@ -181,12 +216,12 @@ def get_apps_status():
 
 
 def get_app_info():
-    ''' exec to get lists of installed and upgradable apps on this system '''
+    """exec to get lists of installed and upgradable apps on this system"""
     app_info = ansible_exec(action='info')
     try:
         app_infos = json.loads(app_info[1])
     except Exception as e:
-        module.fail_json(msg="unable to parse json: {}".format(e))
+        module.fail_json(msg='unable to parse json: {}'.format(e))
     return app_infos['installed'], app_infos['upgradable']
 
 
@@ -203,11 +238,9 @@ def check_app_version(_appname):
 
 def get_and_sort_versions(_appname):
     get_versions = ansible_exec(action='list-app', appname=_appname)[1]
-    available_app_versions = re.findall(
-        r'\b(\d+\.\d+(?:\.\d+)*(?:-[A-Za-z0-9]+)*(?:\s*v\d+)?)\b', get_versions)
+    available_app_versions = re.findall(r'\b(\d+\.\d+(?:\.\d+)*(?:-[A-Za-z0-9]+)*(?:\s*v\d+)?)\b', get_versions)
 
-    available_app_versions.sort(
-        key=lambda s: list(map(int, re.split(r'\D+', s))))
+    available_app_versions.sort(key=lambda s: list(map(int, re.split(r'\D+', s))))
     return available_app_versions
 
 
@@ -240,7 +273,7 @@ def parse_current_configuration(_config):
     config_lines = _config.split('\n')
     config_dict = {}
     for line in config_lines:
-        key_value_pair = line.split(": ", 1)
+        key_value_pair = line.split(': ', 1)
         if len(key_value_pair) == 2:
             key, value = key_value_pair
             config_dict[key] = value.split(' ')[0].strip("'")
@@ -248,11 +281,11 @@ def parse_current_configuration(_config):
 
 
 def format_new_conf(_configuration):
-    _conf_str = ""
+    _conf_str = ''
     if len(_configuration) > 0:
-        _conf_str = "--set "
+        _conf_str = '--set '
         for setting, value in _configuration.items():
-            if value == "" or ' ' in value:
+            if value == '' or ' ' in value:
                 _conf_str += '{}="{}" '.format(setting, value)
             else:
                 _conf_str += '{}={} '.format(setting, value)
@@ -260,22 +293,22 @@ def format_new_conf(_configuration):
 
 
 def check_app_present(_appname):
-    ''' check if a given app is in INSTALLED_APPS_LIST, return bool '''
+    """check if a given app is in INSTALLED_APPS_LIST, return bool"""
     return _appname in AVAILABLE_APPS_LIST and list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
 
 
 def check_app_absent(_appname):
-    ''' check if a given app is NOT in INSTALLED_APPS_LIST, return bool '''
+    """check if a given app is NOT in INSTALLED_APPS_LIST, return bool"""
     return _appname in AVAILABLE_APPS_LIST and not list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
 
 
 def check_app_upgradeable(_appname):
-    ''' check if a given app is in UPGRADABLE_APPS_LIST, return bool '''
+    """check if a given app is in UPGRADABLE_APPS_LIST, return bool"""
     return _appname in AVAILABLE_APPS_LIST and bool(filter(lambda x: _appname in x, UPGRADABLE_APPS_LIST))
 
 
 def generate_tmp_auth_file(_data):
-    ''' generate a temporary auth-file and return path, MUST BE DELETED '''
+    """generate a temporary auth-file and return path, MUST BE DELETED"""
     fileTemp = tempfile.NamedTemporaryFile(delete=False, mode='w')
     fileTemp.write(_data)
     fileTemp.close()
@@ -295,42 +328,64 @@ def stop_app(_appname):
 
 
 def install_app(_appname, _authfile, _desired_version, _auth_username, _configuration):
-    ''' installs an app with given name and path to auth-file, uses ansible_exec()
-        and returns tuple of exit-code and stdout '''
-    return ansible_exec(action='install', appname=_appname, keyfile=_authfile, username=_auth_username,
-                        desired_update=_desired_version, configuration=format_new_conf(_configuration))
+    """installs an app with given name and path to auth-file, uses ansible_exec()
+    and returns tuple of exit-code and stdout"""
+    return ansible_exec(
+        action='install',
+        appname=_appname,
+        keyfile=_authfile,
+        username=_auth_username,
+        desired_update=_desired_version,
+        configuration=format_new_conf(_configuration),
+    )
 
 
 def remove_app(_appname, _authfile, _auth_username):
-    ''' removes an app with given name and path to auth-file, uses ansible_exec()
-        and returns tuple of exit-code and stdout'''
+    """removes an app with given name and path to auth-file, uses ansible_exec()
+    and returns tuple of exit-code and stdout"""
     return ansible_exec(action='remove', appname=_appname, keyfile=_authfile, username=_auth_username)
 
 
 def upgrade_app(_appname, _authfile, _desired_version, _auth_username):
-    ''' upgrades an app with given name and path to auth-file, uses ansible_exec()
-        and returns tuple of exit-code and stdout'''
-    return ansible_exec(action='upgrade', appname=_appname, keyfile=_authfile,
-                        username=_auth_username, desired_update=_desired_version)
+    """upgrades an app with given name and path to auth-file, uses ansible_exec()
+    and returns tuple of exit-code and stdout"""
+    return ansible_exec(
+        action='upgrade',
+        appname=_appname,
+        keyfile=_authfile,
+        username=_auth_username,
+        desired_update=_desired_version,
+    )
 
 
 def stall_app(_appname, _authfile):
-    ''' stalls an app with given name and path to auth-file, uses ansible_exec()
-        and return tuple of exit-code and stdout. '''
+    """stalls an app with given name and path to auth-file, uses ansible_exec()
+    and return tuple of exit-code and stdout."""
     return ansible_exec(action='stall', appname=_appname, keyfile=_authfile)
 
 
 def undo_stall_app(_appname, _authfile):
-    ''' undos the stalling of an app with given name and path to auth-file, uses ansible_exec()
-        and return tuple of exit-code and stdout. '''
+    """undos the stalling of an app with given name and path to auth-file, uses ansible_exec()
+    and return tuple of exit-code and stdout."""
     return ansible_exec(action='undo_stall', appname=_appname, keyfile=_authfile)
 
 
+def pin_app(_appname, _authfile):
+    """pins an app with given name and path to auth-file, uses ansible_exec()
+    and returns tuple of exit-code and stdout."""
+    return ansible_exec(action='pin', appname=_appname, keyfile=_authfile)
+
+
+def unpin_app(_appname, _authfile):
+    """unpins an app with given name and path to auth-file, uses ansible_exec()
+    and returns tuple of exit-code and stdout."""
+    return ansible_exec(action='unpin', appname=_appname, keyfile=_authfile)
+
+
 def get_app_configuration(_appname):
-    ''' get current app configuration, uses ansible_exec()
-        and return a dictionary with configuration parameters. '''
-    config_output = ansible_exec(
-        action='get_configuration', appname=_appname)[1]
+    """get current app configuration, uses ansible_exec()
+    and return a dictionary with configuration parameters."""
+    config_output = ansible_exec(action='get_configuration', appname=_appname)[1]
     current_app_configuration = parse_current_configuration(config_output)
     return current_app_configuration
 
@@ -344,67 +399,44 @@ def check_config_and_return_differences(_current_config, _app_target_config):
     for param in _app_target_config:
         lower_param = param.lower()
         if lower_param not in current_config_lower:
-            raise ValueError(
-                "The parameter {} does not exist in the app".format(param))
+            raise ValueError('The parameter {} does not exist in the app'.format(param))
         if current_config_lower[lower_param] != target_config_lower[lower_param]:
             # Get the original key from the current_config
-            original_key = [
-                key for key in _current_config if key.lower() == lower_param][0]
+            original_key = [key for key in _current_config if key.lower() == lower_param][0]
             new_params[original_key] = _app_target_config[param]
 
     return new_params
 
 
 def configure_app(_appname, _configuration):
-    ''' set app configuration, uses ansible_exec()
-        and return tuple of exit-code and stdout. '''
-    return ansible_exec(action='configure', appname=_appname, configuration=format_new_conf(_configuration))
+    """set app configuration, uses ansible_exec()
+    and return tuple of exit-code and stdout."""
+    return ansible_exec(
+        action='configure',
+        appname=_appname,
+        configuration=format_new_conf(_configuration),
+    )
 
 
 def main():
-    ''' main() is an entry-point for ansible which checks app-status and installs,
-        upgrades, or removes the app based on ansible state and name-parameters '''
+    """main() is an entry-point for ansible which checks app-status and installs,
+    upgrades, or removes the app based on ansible state and name-parameters"""
     global module  # declare ansible-module and parameters globally
     module = AnsibleModule(
         argument_spec=dict(
-            name=dict(
-                type='str',
-                required=True,
-                aliases=['app']
-            ),
+            name=dict(type='str', required=True, aliases=['app']),
             state=dict(
                 type='str',
                 default='present',
-                choices=['present', 'absent', 'started', 'stopped']
+                choices=['present', 'absent', 'started', 'stopped'],
             ),
-            stall=dict(
-                type='str',
-                required=False,
-                choices=["stalled", "unstalled"]
-            ),
-            auth_password=dict(
-                type="str",
-                required=True,
-                no_log=True
-            ),
-            auth_username=dict(
-                type="str",
-                required=True
-            ),
-            version=dict(
-                type='str',
-                required=False,
-                default='current'
-            ),
-            config=dict(
-                type='dict',
-                required=False
-            ),
-            update_app_lists=dict(
-                type='bool',
-                default=True,
-                required=False
-            )
+            stall=dict(type='str', required=False, choices=['stalled', 'unstalled']),
+            pinned=dict(type='bool', default=False, required=False),
+            auth_password=dict(type='str', required=True, no_log=True),
+            auth_username=dict(type='str', required=True),
+            version=dict(type='str', required=False, default='current'),
+            config=dict(type='dict', required=False),
+            update_app_lists=dict(type='bool', default=True, required=False),
         ),
         # mutually_exclusive=[[]],
         # required_one_of=[[]],
@@ -413,10 +445,7 @@ def main():
 
     # This module should only run on UCS-systems
     if not check_ucs():
-        return module.exit_json(
-            changed=True,
-            msg='Non-UCS-system detected. Nothing to do here.'
-        )
+        return module.exit_json(changed=True, msg='Non-UCS-system detected. Nothing to do here.')
 
     # update app lists
     def update_lists():
@@ -424,24 +453,23 @@ def main():
             _update_lists = update_app_lists()
             if _update_lists[0] != 0:
                 return module.fail_json(
-                        msg='''
+                    msg="""
                         An Error occured running univention-app update.
                         To disable updating app lists set "update_app_lists" to False
-                        '''
-                        )
+                        """
+                )
+
     # gather infos and vars
     get_apps_status()
     app_status_target = module.params.get('state')  # desired state of the app
     app_name = module.params.get('name')  # name of the app
-    auth_password = module.params.get(
-        'auth_password')  # password for domain-admin
-    auth_username = module.params.get(
-        'auth_username')
+    auth_password = module.params.get('auth_password')  # password for domain-admin
+    auth_username = module.params.get('auth_username')
     app_present = check_app_present(app_name)
     app_absent = check_app_absent(app_name)
     app_stall_target = module.params.get('stall')
-    app_target_version = check_target_app_version(
-        app_name, module.params.get('version'))
+    app_pinned_target = module.params.get('pinned')
+    app_target_version = check_target_app_version(app_name, module.params.get('version'))
     app_status = check_app_status(app_name)
     app_target_config = module.params.get('config')
     module_changed = False
@@ -451,11 +479,15 @@ def main():
 
     # some basic logic-checks
     if not app_absent and not app_present:  # this means the app does not exist
-        module.fail_json(msg=("app {} does not exist. Please choose from following options:\n{}"
-                              .format(app_name, str(AVAILABLE_APPS_LIST))))
-    if app_absent and app_present:  # schroedinger's app-status
         module.fail_json(
-            msg="an error occured while getting the status of {}".format(app_name))
+            msg=(
+                'app {} does not exist. Please choose from following options:\n{}'.format(
+                    app_name, str(AVAILABLE_APPS_LIST)
+                )
+            )
+        )
+    if app_absent and app_present:  # schroedinger's app-status
+        module.fail_json(msg='an error occured while getting the status of {}'.format(app_name))
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
@@ -464,24 +496,22 @@ def main():
         if app_target_config:
             default_config = get_app_configuration(app_name)
             try:
-                config = check_config_and_return_differences(
-                    default_config, app_target_config)
+                config = check_config_and_return_differences(default_config, app_target_config)
             except ValueError as e:
                 module.fail_json(
-                    module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
+                    module_changed=True,
+                    msg="The parameter '{}' does not exist on app {}".format(e, app_name),
+                )
 
         try:
-            _install_app = install_app(
-                app_name, auth_file, app_target_version, auth_username, config)
+            _install_app = install_app(app_name, auth_file, app_target_version, auth_username, config)
             if _install_app[0] == 0:
                 module_changed = True
                 if len(config) > 0:
-                    new_config_msg = '. The following configuration options were changed: {}'.format(
-                        config)
+                    new_config_msg = '. The following configuration options were changed: {}'.format(config)
                     config_changed = True
             else:
-                module.fail_json(
-                    msg="an error occured while installing {}".format(app_target_version))
+                module.fail_json(msg='an error occured while installing {}'.format(app_target_version))
         finally:
             os.remove(auth_file)
 
@@ -491,16 +521,16 @@ def main():
             _remove_app = remove_app(app_name, auth_file, auth_username)
             if _remove_app[0] == 0:
                 module.exit_json(
-                    changed=True, msg="App {} was successfully deinstalled.".format(app_name))
+                    changed=True,
+                    msg='App {} was successfully deinstalled.'.format(app_name),
+                )
             else:
-                module.fail_json(
-                    msg="an error occured while uninstalling {}".format(app_name))
+                module.fail_json(msg='an error occured while uninstalling {}'.format(app_name))
         finally:
             os.remove(auth_file)
 
     elif app_status_target == 'absent' and app_absent:
-        module.exit_json(
-            changed=False, msg="App {} not installed. No change.".format(app_name))
+        module.exit_json(changed=False, msg='App {} not installed. No change.'.format(app_name))
     app_version = check_app_version(app_name)  # check App version
     if app_status_target != 'absent' and LooseVersion(app_target_version) > LooseVersion(app_version):
         auth_file = generate_tmp_auth_file(auth_password)
@@ -508,17 +538,16 @@ def main():
         try:
             available_app_versions = get_and_sort_versions(app_name)
             # check how many versions between current and target
-            versions_to_update = available_app_versions[available_app_versions.index(
-                app_version)+1:available_app_versions.index(app_target_version)+1]
+            start = available_app_versions.index(app_version) + 1
+            end = available_app_versions.index(app_target_version) + 1
+            versions_to_update = available_app_versions[start:end]
             for version in versions_to_update:
                 # Update App & check if Update successfull
-                _upgrade_app = upgrade_app(
-                    app_name, auth_file, version, auth_username)
+                _upgrade_app = upgrade_app(app_name, auth_file, version, auth_username)
                 if _upgrade_app[0] == 0 or _upgrade_app[0] == 1:
                     continue
                 else:
-                    module.fail_json(
-                        msg="an error occured while upgrading {}".format(app_name))
+                    module.fail_json(msg='an error occured while upgrading {}'.format(app_name))
             module_changed = True
         finally:
             os.remove(auth_file)
@@ -527,25 +556,27 @@ def main():
         current_config = get_app_configuration(app_name)
         # check if keys exist and params changed
         try:
-            new_params = check_config_and_return_differences(
-                current_config, app_target_config)
+            new_params = check_config_and_return_differences(current_config, app_target_config)
         except ValueError as e:
             module.fail_json(
-                module_changed=True, msg="The parameter '{}' does not exist on app {}".format(e, app_name))
+                module_changed=True,
+                msg="The parameter '{}' does not exist on app {}".format(e, app_name),
+            )
         if len(new_params) > 0:
             _configure_app = configure_app(app_name, new_params)
             if not _configure_app[0] == 0:
-                module.fail_json(msg="An error occured while configuring {} with configuration:{}".format(
-                    app_name, new_params))
+                module.fail_json(
+                    msg='An error occured while configuring {} with configuration:{}'.format(app_name, new_params)
+                )
             else:
                 module_changed = True
-                new_config_msg = '. The following configuration options were changed: {}'.format(
-                    new_params)
+                new_config_msg = '. The following configuration options were changed: {}'.format(new_params)
 
     elif app_status_target != 'absent' and LooseVersion(app_target_version) < LooseVersion(app_version):
         module.fail_json(
             msg="""The current version of {} is higher than the desired version.
-              The version currently installed is: {}""".format(app_name, app_version))
+              The version currently installed is: {}""".format(app_name, app_version)
+        )
 
     if app_status_target in ['started', 'stopped']:
         if app_status_target == 'started' and app_status != 'started':
@@ -563,8 +594,7 @@ def main():
             if _stall_app[0] == 0:
                 module_changed = True
             else:
-                module.fail_json(
-                    msg="an error occurred while stalling {}".format(app_name))
+                module.fail_json(msg='an error occurred while stalling {}'.format(app_name))
         finally:
             os.remove(auth_file)
     elif app_present and app_stall_target == 'unstalled':
@@ -575,17 +605,40 @@ def main():
             if _undo_stall_app[0] == 0:
                 module_changed = True
             else:
-                module.fail_json(
-                    msg="an error occurred while undoing the stall {}".format(app_name))
+                module.fail_json(msg='an error occurred while undoing the stall {}'.format(app_name))
+        finally:
+            os.remove(auth_file)
+
+    if app_present and app_pinned_target is True:
+        auth_file = generate_tmp_auth_file(auth_password)
+        try:
+            _pin_app = pin_app(app_name, auth_file)
+            if _pin_app[0] == 0:
+                module_changed = True
+            else:
+                module.fail_json(msg='an error occurred while pinning {}'.format(app_name))
+        finally:
+            os.remove(auth_file)
+    elif app_present and app_pinned_target is False:
+        auth_file = generate_tmp_auth_file(auth_password)
+        try:
+            _unpin_app = unpin_app(app_name, auth_file)
+            if _unpin_app[0] == 0:
+                module_changed = True
+            else:
+                module.fail_json(msg='an error occurred while unpinning {}'.format(app_name))
         finally:
             os.remove(auth_file)
 
     if module_changed:
-        module.exit_json(changed=module_changed, msg="{} is {} in version {} {}".format(
-            app_name, app_status_target, check_app_version(app_name), new_config_msg))
+        module.exit_json(
+            changed=module_changed,
+            msg='{} is {} in version {} {}'.format(
+                app_name, app_status_target, check_app_version(app_name), new_config_msg
+            ),
+        )
     else:
-        module.exit_json(changed=module_changed, msg="No changes for {}".format(
-            app_name))
+        module.exit_json(changed=module_changed, msg='No changes for {}'.format(app_name))
 
 
 if __name__ == '__main__':
