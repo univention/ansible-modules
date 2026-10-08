@@ -65,6 +65,33 @@
     auth_password: "univention"
     stall: "unstalled"
 
+# Pin App
+- name: "Pin ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pin: true
+
+# Unpin App
+- name: "Unpin ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pin: false
+
+# unstall App
+- name: "Unstall ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    stall: "unstalled"
+
 # Deinstall App
 - name: "Uninstall ox-connector"
   univention_app:
