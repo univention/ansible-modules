@@ -25,9 +25,9 @@ The below requirements are needed on the host that executes this module.
 | version (string)        | "current" | The desired version of the app (cannot be lower than currently installed) or latest (If App not installed, "current" behaves like latest). |
 | auth_username (string)  |           | The Administrator Username on the UCS system.                                                                                              |
 | auth_password (string)  |           | The Admin Password for the system.                                                                                                         |
-| config (dict)           |           | A dict of configuration properties for the selceted Application (case-insentitive).                                                        |
+| config (dict)           |           | A dict of configuration properties for the selected Application (case-insentitive).                                                        |
 | stall (str)             |           | Whether App should be stalled or unstalled ("stalled", "unstalled").                                                                       |
-| pin (bool)              | false     | Whether the App should be pinned (true, false)                                                                                             |
+| pinnned (bool)              | false     | Whether the App should be pinned (true, false)                                                                                             |
 | update_app_lists (bool) | True      | Updates the list of apps and their versions - Only runs when app is installed or updated                                                   |
 
 ## Notes
