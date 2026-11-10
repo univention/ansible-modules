@@ -72,7 +72,7 @@
     state: "present"
     auth_username: "Administrator"
     auth_password: "univention"
-    pin: true
+    pinned: true
 
 # Unpin App
 - name: "Unpin ox-connector"
@@ -81,7 +81,7 @@
     state: "present"
     auth_username: "Administrator"
     auth_password: "univention"
-    pin: false
+    pinned: false
 
 # unstall App
 - name: "Unstall ox-connector"
