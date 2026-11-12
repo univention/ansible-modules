@@ -27,7 +27,7 @@ The below requirements are needed on the host that executes this module.
 | auth_password (string)  |           | The Admin Password for the system.                                                                                                         |
 | config (dict)           |           | A dict of configuration properties for the selected Application (case-insentitive).                                                        |
 | stall (str)             |           | Whether App should be stalled or unstalled ("stalled", "unstalled").                                                                       |
-| pinnned (bool)              | false     | Whether the App should be pinned (true, false)                                                                                             |
+| pinned (bool)           | false     | Whether the App should be pinned (true, false)                                                                                             |
 | update_app_lists (bool) | True      | Updates the list of apps and their versions - Only runs when app is installed or updated                                                   |
 
 ## Notes
@@ -131,6 +131,6 @@ The below requirements are needed on the host that executes this module.
 ## Return Values
 
 | Key               | Returned | Description                                                                                                  |
-| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+|-------------------|----------|--------------------------------------------------------------------------------------------------------------|
 | `changed`(list)   | always   | Whether any changed were made.                                                                               |
 | `message`(string) | always   | A human-readable information about which App was changed with information such as state, version and config. |
