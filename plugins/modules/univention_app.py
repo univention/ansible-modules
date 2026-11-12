@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2020-2023, Univention GmbH
+# Copyright: (c) 2020-2026, Univention GmbH
 # Written by Lukas Zumvorde <zumvorde@univention.de>,
 #  Jan-Luca Kiok <kiok@univention.de>, Melf Clausen <melf.clausen.extern@univention.de>,
-#  Tim Breidenbach <breidenbach@univention.de>
+#  Tim Breidenbach <breidenbach@univention.de>, Oliver Friedrich <Friedrich@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -28,7 +28,7 @@ description:
 notes:
   - none
 requirements: [ ]
-author: Stefan Ahrens, Melf Clausen
+author: Melf Clausen, Lukas Zumvorde, Jan-Luca Kiok, Tim Breidenbach, Oliver Friedrich
 options:
   name:
     description:
@@ -57,7 +57,10 @@ options:
     - 'Whether an App should be stalled or unstalled'
     required: false
   pinned:
-    - 'Whether an App should be pinned or unpinned'
+    description:
+    - 'Whether an App should be pinned or unpinned. Pinned apps can not be updated or removed.
+       If not set, the pin state is left untouched (but a pinned app still can not be updated or removed).
+       Set to false to unpin the app first, so that it can be updated or removed.'
     required: false
   update_app_lists:
     description:
@@ -186,6 +189,7 @@ def ansible_exec(
         'configure': 'univention-app {} {} {}'.format(action, appname, configuration),
         'stall': 'univention-app {} {}'.format(action, appname),
         'undo_stall': 'univention-app stall {} --undo'.format(appname),
+        'get_pinned': 'ucr get appcenter/apps/{}/pinned'.format(appname),
         'pin': 'univention-app pin {}'.format(appname),
         'unpin': 'univention-app pin --revert {}'.format(appname),
     }
@@ -370,16 +374,22 @@ def undo_stall_app(_appname, _authfile):
     return ansible_exec(action='undo_stall', appname=_appname, keyfile=_authfile)
 
 
-def pin_app(_appname, _authfile):
-    """pins an app with given name and path to auth-file, uses ansible_exec()
+def pin_app(_appname):
+    """pins an app with given name, uses ansible_exec()
     and returns tuple of exit-code and stdout."""
-    return ansible_exec(action='pin', appname=_appname, keyfile=_authfile)
+    return ansible_exec(action='pin', appname=_appname)
 
 
-def unpin_app(_appname, _authfile):
-    """unpins an app with given name and path to auth-file, uses ansible_exec()
+def unpin_app(_appname):
+    """unpins an app with given name, uses ansible_exec()
     and returns tuple of exit-code and stdout."""
-    return ansible_exec(action='unpin', appname=_appname, keyfile=_authfile)
+    return ansible_exec(action='unpin', appname=_appname)
+
+
+def get_app_pinned(_appname):
+    """return True if the app is pinned (UCR appcenter/apps/<name>/pinned is true; unset means unpinned)"""
+    rc, out, _ = ansible_exec(action='get_pinned', appname=_appname)
+    return rc == 0 and out.strip().lower() in ('true', 'yes', '1', 'on')
 
 
 def get_app_configuration(_appname):
@@ -431,7 +441,7 @@ def main():
                 choices=['present', 'absent', 'started', 'stopped'],
             ),
             stall=dict(type='str', required=False, choices=['stalled', 'unstalled']),
-            pinned=dict(type='bool', default=False, required=False),
+            pinned=dict(type='bool', default=None, required=False),
             auth_password=dict(type='str', required=True, no_log=True),
             auth_username=dict(type='str', required=True),
             version=dict(type='str', required=False, default='current'),
@@ -488,6 +498,27 @@ def main():
         )
     if app_absent and app_present:  # schroedinger's app-status
         module.fail_json(msg='an error occured while getting the status of {}'.format(app_name))
+
+    # pinned apps can neither be updated nor removed
+    app_pinned = app_present and get_app_pinned(app_name)
+    upgrade_needed = bool(
+        app_present
+        and app_status_target != 'absent'
+        and LooseVersion(app_target_version) > LooseVersion(check_app_version(app_name))
+    )
+    if app_pinned:
+        if app_pinned_target is False and (upgrade_needed or app_status_target == 'absent'):
+            # explicitly unpinned by the task, so the app may be updated/removed
+            _unpin_app = unpin_app(app_name)
+            if _unpin_app[0] != 0:
+                module.fail_json(msg='an error occurred while unpinning {}'.format(app_name))
+            module_changed = True
+        elif app_status_target == 'absent':
+            module.fail_json(
+                msg='App {} is pinned and can not be uninstalled. Set pinned=false first.'.format(app_name)
+            )
+        elif upgrade_needed:
+            module.fail_json(msg='App {} is pinned and can not be updated. Set pinned=false first.'.format(app_name))
 
     if app_status_target != 'absent' and not app_present:
         auth_file = generate_tmp_auth_file(auth_password)
@@ -609,26 +640,16 @@ def main():
         finally:
             os.remove(auth_file)
 
-    if app_present and app_pinned_target is True:
-        auth_file = generate_tmp_auth_file(auth_password)
-        try:
-            _pin_app = pin_app(app_name, auth_file)
-            if _pin_app[0] == 0:
-                module_changed = True
-            else:
+    if app_status_target != 'absent' and app_pinned_target is not None:
+        current_pinned = get_app_pinned(app_name)
+        if app_pinned_target and not current_pinned:
+            if pin_app(app_name)[0] != 0:
                 module.fail_json(msg='an error occurred while pinning {}'.format(app_name))
-        finally:
-            os.remove(auth_file)
-    elif app_present and app_pinned_target is False:
-        auth_file = generate_tmp_auth_file(auth_password)
-        try:
-            _unpin_app = unpin_app(app_name, auth_file)
-            if _unpin_app[0] == 0:
-                module_changed = True
-            else:
+            module_changed = True
+        elif not app_pinned_target and current_pinned:
+            if unpin_app(app_name)[0] != 0:
                 module.fail_json(msg='an error occurred while unpinning {}'.format(app_name))
-        finally:
-            os.remove(auth_file)
+            module_changed = True
 
     if module_changed:
         module.exit_json(

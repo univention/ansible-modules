@@ -65,7 +65,9 @@
     auth_password: "univention"
     stall: "unstalled"
 
-# Pin App
+# --- Pinning ---
+
+# unpinned + present, pinned=true -> changed
 - name: "Pin ox-connector"
   univention_app:
     name: "ox-connector"
@@ -73,8 +75,58 @@
     auth_username: "Administrator"
     auth_password: "univention"
     pinned: true
+  register: "pin_unpinned"
+- name: "Assert pin_unpinned changed=True"
+  ansible.builtin.assert:
+    that:
+      - "pin_unpinned is changed"
 
-# Unpin App
+# pinned + present, pinned=true -> no change
+- name: "Pin ox-connector again"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: true
+  register: "pin_pinned"
+- name: "Assert pin_pinned changed=False"
+  ansible.builtin.assert:
+    that:
+      - "pin_pinned is not changed"
+
+# pinned app can't be uninstalled
+- name: "Uninstall pinned ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "absent"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: true
+  register: "remove_pinned"
+  ignore_errors: true
+- name: "Assert remove_pinned failed"
+  ansible.builtin.assert:
+    that:
+      - "remove_pinned is failed"
+      - "'pinned and can not be uninstalled' in remove_pinned.msg"
+
+# pinned app can't be uninstalled even if pinned is not set
+- name: "Uninstall pinned ox-connector (pinned unset)"
+  univention_app:
+    name: "ox-connector"
+    state: "absent"
+    auth_username: "Administrator"
+    auth_password: "univention"
+  register: "remove_pinned_unset"
+  ignore_errors: true
+- name: "Assert remove_pinned_unset failed"
+  ansible.builtin.assert:
+    that:
+      - "remove_pinned_unset is failed"
+      - "'pinned and can not be uninstalled' in remove_pinned_unset.msg"
+
+# pinned app can't be updated (reinstall an old version first)
 - name: "Unpin ox-connector"
   univention_app:
     name: "ox-connector"
@@ -82,6 +134,98 @@
     auth_username: "Administrator"
     auth_password: "univention"
     pinned: false
+  register: "unpin_present"
+- name: "Assert unpin_present changed=True"
+  ansible.builtin.assert:
+    that:
+      - "unpin_present is changed"
+- name: "Remove ox-connector for update tests"
+  univention_app:
+    name: "ox-connector"
+    state: "absent"
+    auth_username: "Administrator"
+    auth_password: "univention"
+- name: "Install old ox-connector pinned"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    version: "2.1.0"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: true
+- name: "Update pinned ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    version: "2.1.3"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: true
+  register: "update_pinned"
+  ignore_errors: true
+- name: "Assert update_pinned failed"
+  ansible.builtin.assert:
+    that:
+      - "update_pinned is failed"
+      - "'pinned and can not be updated' in update_pinned.msg"
+
+# pinned=false allows updating
+- name: "Update and unpin ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    version: "2.1.3"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: false
+  register: "update_unpinned"
+- name: "Assert update_unpinned changed=True"
+  ansible.builtin.assert:
+    that:
+      - "update_unpinned is changed"
+
+# pinned=false is idempotent on an unpinned app
+- name: "Unpin ox-connector again"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: false
+  register: "unpin_unpinned"
+- name: "Assert unpin_unpinned changed=False"
+  ansible.builtin.assert:
+    that:
+      - "unpin_unpinned is not changed"
+
+# pinned app can be removed with pinned=false
+- name: "Pin ox-connector before removal"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: true
+- name: "Uninstall and unpin ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "absent"
+    auth_username: "Administrator"
+    auth_password: "univention"
+    pinned: false
+  register: "remove_unpinned"
+- name: "Assert remove_unpinned changed=True"
+  ansible.builtin.assert:
+    that:
+      - "remove_unpinned is changed"
+
+# reinstall for the remaining tasks
+- name: "Install ox-connector"
+  univention_app:
+    name: "ox-connector"
+    state: "present"
+    auth_username: "Administrator"
+    auth_password: "univention"
 
 # unstall App
 - name: "Unstall ox-connector"
