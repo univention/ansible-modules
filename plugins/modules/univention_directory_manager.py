@@ -1,21 +1,19 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2020-2021, Univention GmbH
+# Copyright: (c) 2020-2026, Univention GmbH
 # Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
-from __future__ import (absolute_import, division, print_function)
-__metaclass__ = type
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.2',
     'status': ['preview'],
-    'supported_by': 'comunity'
+    'supported_by': 'community'
 }
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: univention_directory_manager
 
@@ -64,21 +62,28 @@ options:
         description:
             - A list of dictionaries with the keys property and value.
             - Properties of the objects are to be set to the given values.
+            - For multivalued properties the given value(s) are added to the existing values
+              (existing values are kept). The value may be a single value or a list of values.
+            - Exception, if the value is a dictionary (e.g. localized properties) the property is
+              set as a whole and replaces the existing value.
         type: list
         required: False
     unset_properties:
         description:
-            - A list of dictionaries with the key property.
+            - A list of dictionaries with the key property and the optional key value.
             - The listed properties of the objects are to be unset.
+            - For multivalued properties, if value is given, only this value (or these values,
+              if a list) is removed and the other values are kept. Without value, all values are removed.
+            - For single-valued properties value is ignored.
         type: list
         required: False
 
 author:
     - Lukas Zumvorde
     - Jan-Luca Kiok
-'''
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 # create a new user object
 - name: create a user
   univention_directory_manager:
@@ -152,6 +157,16 @@ EXAMPLES = r'''
       - property: 'firstname'
         value: 'max'
 
+# multivalued properties: values are added to the existing ones
+- name: modify testuser3 - add to groups
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    set_properties:
+      - property: 'groups'
+        value: 'cn=local users,cn=groups,$ldap_base'
+
 # remove specific properties
 - name: modify testuser3 - remove property
   univention_directory_manager:
@@ -160,10 +175,19 @@ EXAMPLES = r'''
     filter: '(uid=testuser3)'
     unset_properties:
       - property: 'firstname'
-        value: 'does not matter'
-'''
 
-RETURN = r'''
+# remove a single value of a multivalued property
+- name: modify testuser3 - remove from one group only
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
+        value: 'cn=local users,cn=groups,$ldap_base'
+"""
+
+RETURN = r"""
 meta['changed_objects']:
     description: A list of all objects that were changed.
 meta['created']:
@@ -174,9 +198,9 @@ meta['modified']:
     description: The modified object and his changed attributes.
 msg:
     description: A human-readable information about which objects were changed.
-'''
+"""
 
-import traceback # noqa F401
+import traceback  # noqa F401
 
 from ansible.module_utils.basic import AnsibleModule  # noqa F401
 from ansible.module_utils.common.text.converters import to_native  # noqa F401
@@ -191,9 +215,8 @@ except ModuleNotFoundError:
     UDM_IMP_ERR = traceback.format_exc()
 
 
-class UDMAnsibleModule():
-    '''UDMAnsibleModule
-    '''
+class UDMAnsibleModule:
+    """UDMAnsibleModule"""
 
     udm_api_version = 2
     udm_module = None
@@ -210,7 +233,7 @@ class UDMAnsibleModule():
             created={},
             removed={},
             modified={},
-            ),
+        ),
         msg='',
     )
 
@@ -325,10 +348,46 @@ class UDMAnsibleModule():
         return value
 
     def _set_property(self, obj, prop, value):
-        self._try_function(
-            setattr,
-            obj.props, prop, self._decode_value(obj, prop, value)
-        )
+        self._try_function(setattr, obj.props, prop, self._decode_value(obj, prop, value))
+
+    @staticmethod
+    def _as_list(value):
+        """Normalize a value to a list of lists/scalars (tuples become lists)."""
+        if value is None:
+            return []
+        if not isinstance(value, (list, tuple)):
+            value = [value]
+        return [list(v) if isinstance(v, tuple) else v for v in value]
+
+    def _is_multivalue(self, obj, prop):
+        """A property is multivalued if its current (python) value is a list."""
+        try:
+            return isinstance(getattr(obj.props, prop), list)
+        except AttributeError:
+            return False
+
+    def _merge_property(self, obj, prop, value):
+        """Set a property. Multivalued properties get the new values added to the existing ones."""
+        if isinstance(value, dict) or not self._is_multivalue(obj, prop):
+            # dict values (e.g. localized properties) are set as a whole
+            return self._set_property(obj, prop, value)
+        current = self._as_list(self._encode_value(obj, prop, getattr(obj.props, prop)))
+        merged = list(current)
+        for val in self._as_list(value):
+            if val not in merged:
+                merged.append(val)
+        if merged != current:
+            self._set_property(obj, prop, merged)
+
+    def _unset_property(self, obj, prop, value=None):
+        """Unset a property. For multivalued properties only the given value(s) are removed, if provided."""
+        if value is None or not self._is_multivalue(obj, prop):
+            return self._set_property(obj, prop, None)
+        current = self._as_list(self._encode_value(obj, prop, getattr(obj.props, prop)))
+        remove = self._as_list(value)
+        remaining = [val for val in current if val not in remove]
+        if remaining != current:
+            self._set_property(obj, prop, remaining)
 
     def _get_obj_properties_list(self, obj):
         return [prop for prop in dir(obj.props) if not prop.startswith(('__', '_'))]
@@ -363,9 +422,7 @@ class UDMAnsibleModule():
             obj.options = self.ansible_params['options']
 
     def _create_object(self):
-        obj = self.udm_module.new(
-            superordinate=self.ansible_params.get('superordinate')
-        )
+        obj = self.udm_module.new(superordinate=self.ansible_params.get('superordinate'))
         if self.ansible_params['position']:
             obj.position = self.ansible_params['position']
         self._apply_options(obj)
@@ -374,11 +431,9 @@ class UDMAnsibleModule():
             for attr in self.ansible_params['set_properties']:
                 prop_name = attr['property']
                 prop_value = attr['value']
-                self._set_property(obj, prop_name, prop_value)
+                self._merge_property(obj, prop_name, prop_value)
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.save
-            )
+            self._try_function(obj.save)
             self.changed_objects.append(obj.dn)
             self._set_changes(obj, obj.dn, 'new')
 
@@ -389,27 +444,23 @@ class UDMAnsibleModule():
         if self.ansible_params['unset_properties']:
             for attr in self.ansible_params['unset_properties']:
                 prop_name = attr['property']
-                self._set_property(obj, prop_name, None)
+                self._unset_property(obj, prop_name, attr.get('value'))
         if self.ansible_params['set_properties']:
             for attr in self.ansible_params['set_properties']:
                 prop_name = attr['property']
                 prop_value = attr['value']
-                self._set_property(obj, prop_name, prop_value)
-                if prop_name == "password":
-                    self._set_property(obj, "overridePWHistory", "1")
+                self._merge_property(obj, prop_name, prop_value)
+                if prop_name == 'password':
+                    self._set_property(obj, 'overridePWHistory', '1')
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.save
-            )
+            self._try_function(obj.save)
             self.changed_objects.append(obj.dn)
             self._set_changes(obj, obj.dn, 'new')
 
     def _remove_objects(self, obj):
         self._set_changes(obj, obj.dn, 'old')
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.delete
-            )
+            self._try_function(obj.delete)
             self.changed_objects.append(obj.dn)
 
     def _detect_changes(self):
@@ -419,12 +470,12 @@ class UDMAnsibleModule():
         if _new and not _old:
             # obj created
             self.result['meta']['created'] = _new
-            self.result['msg'] = "created objects: {}".format(' '.join(self.changed_objects))
+            self.result['msg'] = 'created objects: {}'.format(' '.join(self.changed_objects))
             self.result['changed'] = True
         elif _old and not _new:
             # obj removed
             self.result['meta']['removed'] = _old
-            self.result['msg'] = "removed objects: {}".format(' '.join(self.changed_objects))
+            self.result['msg'] = 'removed objects: {}'.format(' '.join(self.changed_objects))
             self.result['changed'] = True
         elif _new and _old:
             # obj modified
@@ -448,10 +499,10 @@ class UDMAnsibleModule():
                             changed = True
             if changed:
                 self.result['meta']['modified'] = _diff
-                self.result['msg'] = "modified objects: {}".format(' '.join(self.changed_objects))
+                self.result['msg'] = 'modified objects: {}'.format(' '.join(self.changed_objects))
                 self.result['changed'] = True
         if not self.result['changed']:
-            self.result['msg'] = "nothing changed"
+            self.result['msg'] = 'nothing changed'
 
     def run(self):
         # univention module
@@ -480,7 +531,7 @@ class UDMAnsibleModule():
 def run_module():
     module_args = dict(
         module=dict(
-            type='str',
+            type='str', 
             required=True
         ),
         position=dict(

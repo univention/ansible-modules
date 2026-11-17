@@ -35,6 +35,60 @@
       - property: "firstname"
         value: "does not matter"
 
+- name: "Modify testuser1 - add a group (multivalued property)"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: "cn=Domain Admins,cn=groups,{{ base_dn.stdout }}"
+  register: "groups_add"
+
+- name: "Modify testuser1 - add the same group again"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: ["cn=Domain Admins,cn=groups,{{ base_dn.stdout }}"]
+  register: "groups_add_again"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_add"
+  changed_when: false
+
+- name: "Check that the group was added, the existing ones kept and the module is idempotent"
+  ansible.builtin.assert:
+    that:
+      - "groups_add.changed or ansible_check_mode"
+      - "not groups_add_again.changed"
+      - "ansible_check_mode or groups_after_add.stdout is search('cn=Domain Admins,')"
+      - "ansible_check_mode or groups_after_add.stdout is search('cn=Domain Users,')"
+
+- name: "Modify testuser1 - remove only one group"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    unset_properties:
+      - property: "groups"
+        value: "cn=Domain Admins,cn=groups,{{ base_dn.stdout }}"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_unset"
+  changed_when: false
+
+- name: "Check that only the given group was removed"
+  ansible.builtin.assert:
+    that:
+      - "groups_after_unset.stdout is not search('cn=Domain Admins,')"
+      - "groups_after_unset.stdout is search('cn=Domain Users,')"
+  when: "not ansible_check_mode"
+
 - name: "Delete a user with a search filter"
   univention_directory_manager:
     module: "users/user"
