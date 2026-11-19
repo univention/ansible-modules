@@ -195,7 +195,7 @@ def check_app_version(_appname):
     app_version = None
     installed_apps_version, _ = get_app_info()
     for app_info in installed_apps_version:
-        if _appname in app_info:
+        if app_id(app_info) == _appname:
             app_version = app_info.split('=')[-1]
             break
     return app_version
@@ -259,19 +259,34 @@ def format_new_conf(_configuration):
     return _conf_str
 
 
+def app_id(_entry):
+    ''' strip the version from an "<id>=<version>" entry of univention-app info '''
+    return _entry.split('=', 1)[0]
+
+
+def check_app_available(_appname):
+    ''' check if a given app id is in AVAILABLE_APPS_LIST, return bool '''
+    return _appname in AVAILABLE_APPS_LIST.split()
+
+
+def check_app_installed(_appname):
+    ''' check if a given app id is in INSTALLED_APPS_LIST, return bool '''
+    return any(app_id(x) == _appname for x in INSTALLED_APPS_LIST)
+
+
 def check_app_present(_appname):
     ''' check if a given app is in INSTALLED_APPS_LIST, return bool '''
-    return _appname in AVAILABLE_APPS_LIST and list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
+    return check_app_available(_appname) and check_app_installed(_appname)
 
 
 def check_app_absent(_appname):
     ''' check if a given app is NOT in INSTALLED_APPS_LIST, return bool '''
-    return _appname in AVAILABLE_APPS_LIST and not list(filter(lambda x: _appname in x, INSTALLED_APPS_LIST))
+    return check_app_available(_appname) and not check_app_installed(_appname)
 
 
 def check_app_upgradeable(_appname):
     ''' check if a given app is in UPGRADABLE_APPS_LIST, return bool '''
-    return _appname in AVAILABLE_APPS_LIST and bool(filter(lambda x: _appname in x, UPGRADABLE_APPS_LIST))
+    return check_app_available(_appname) and any(app_id(x) == _appname for x in UPGRADABLE_APPS_LIST)
 
 
 def generate_tmp_auth_file(_data):
