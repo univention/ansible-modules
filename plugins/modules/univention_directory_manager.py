@@ -64,12 +64,26 @@ options:
         description:
             - A list of dictionaries with the keys property and value.
             - Properties of the objects are to be set to the given values.
+            - For multivalued properties of existing objects the given value(s) are added to the existing
+              values (existing values are kept, nothing is removed). The value may be a single value or a
+              list of values. DN values are compared case-insensitively.
+            - Multivalued properties with complex entries, e.g. C(homePostalAddress), must be given as
+              a list of lists, e.g. C([[street, zip, city]]), otherwise each list item is taken as a value.
+            - Exception, if the value is a dictionary (e.g. localized properties) the property is
+              set as a whole and replaces the existing value.
+            - To replace all values of a multivalued property, unset it in the same task with
+              I(unset_properties) (unsetting is done before setting) and list the new values here.
+            - When creating a new object, the values are set as given.
         type: list
         required: False
     unset_properties:
         description:
-            - A list of dictionaries with the key property.
+            - A list of dictionaries with the key property and the optional key value.
             - The listed properties of the objects are to be unset.
+            - For multivalued properties, if value is given, only this value (or these values,
+              if a list) is removed and the other values are kept. Without value, all values are removed.
+            - DN values are compared case-insensitively.
+            - For single-valued properties value is ignored.
         type: list
         required: False
 
@@ -152,6 +166,16 @@ EXAMPLES = r'''
       - property: 'firstname'
         value: 'max'
 
+# multivalued properties: values are added to the existing ones
+- name: modify testuser3 - add to groups
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    set_properties:
+      - property: 'groups'
+        value: 'cn=local users,cn=groups,$ldap_base'
+
 # remove specific properties
 - name: modify testuser3 - remove property
   univention_directory_manager:
@@ -160,7 +184,16 @@ EXAMPLES = r'''
     filter: '(uid=testuser3)'
     unset_properties:
       - property: 'firstname'
-        value: 'does not matter'
+
+# remove a single value of a multivalued property
+- name: modify testuser3 - remove from one group only
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
+        value: 'cn=local users,cn=groups,$ldap_base'
 '''
 
 RETURN = r'''
@@ -176,6 +209,7 @@ msg:
     description: A human-readable information about which objects were changed.
 '''
 
+import re  # noqa: E402
 import traceback # noqa F401
 
 from ansible.module_utils.basic import AnsibleModule  # noqa F401
@@ -330,6 +364,62 @@ class UDMAnsibleModule():
             obj.props, prop, self._decode_value(obj, prop, value)
         )
 
+    @staticmethod
+    def _as_list(value):
+        """Normalize a value to a list of lists/scalars (tuples become lists)."""
+        if value is None:
+            return []
+        if not isinstance(value, (list, tuple)):
+            value = [value]
+        return [list(v) if isinstance(v, tuple) else v for v in value]
+
+    @staticmethod
+    def _compare_key(value):
+        """Key to compare values. DNs are case-insensitive and ignore spaces around ',' and '='."""
+        if isinstance(value, str) and re.match(r'^[\w.-]+\s*=.*,\s*[\w.-]+\s*=', value):
+            return re.sub(r'\s*([,=])\s*', r'\1', value.strip()).lower()
+        return value
+
+    def _is_multivalue(self, obj, prop):
+        """
+        A property is multivalued if its current python value is a list.
+        Properties whose encoder returns a dict (e.g. localized values like displayName) are
+        no lists, so they are never merged but replaced as a whole.
+        """
+        try:
+            return isinstance(getattr(obj.props, prop), list)
+        except AttributeError:
+            return False
+
+    def _current_values(self, obj, prop):
+        return self._as_list(self._encode_value(obj, prop, getattr(obj.props, prop)))
+
+    def _merge_property(self, obj, prop, value):
+        """Set a property. Multivalued properties get the new values added to the existing ones."""
+        if isinstance(value, dict) or not self._is_multivalue(obj, prop):
+            # dict values (e.g. localized properties) are set as a whole
+            return self._set_property(obj, prop, value)
+        current = self._current_values(obj, prop)
+        known = [self._compare_key(val) for val in current]
+        merged = list(current)
+        for val in self._as_list(value):
+            key = self._compare_key(val)
+            if key not in known:
+                merged.append(val)
+                known.append(key)
+        if len(merged) != len(current):
+            self._set_property(obj, prop, merged)
+
+    def _unset_property(self, obj, prop, value=None):
+        """Unset a property. For multivalued properties only the given value(s) are removed, if provided."""
+        if value is None or not self._is_multivalue(obj, prop):
+            return self._set_property(obj, prop, None)
+        current = self._current_values(obj, prop)
+        remove = [self._compare_key(val) for val in self._as_list(value)]
+        remaining = [val for val in current if self._compare_key(val) not in remove]
+        if len(remaining) != len(current):
+            self._set_property(obj, prop, remaining)
+
     def _get_obj_properties_list(self, obj):
         return [prop for prop in dir(obj.props) if not prop.startswith(('__', '_'))]
 
@@ -389,12 +479,12 @@ class UDMAnsibleModule():
         if self.ansible_params['unset_properties']:
             for attr in self.ansible_params['unset_properties']:
                 prop_name = attr['property']
-                self._set_property(obj, prop_name, None)
+                self._unset_property(obj, prop_name, attr.get('value'))
         if self.ansible_params['set_properties']:
             for attr in self.ansible_params['set_properties']:
                 prop_name = attr['property']
                 prop_value = attr['value']
-                self._set_property(obj, prop_name, prop_value)
+                self._merge_property(obj, prop_name, prop_value)
                 if prop_name == "password":
                     self._set_property(obj, "overridePWHistory", "1")
         if not self.ansible_module.check_mode:
