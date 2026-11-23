@@ -1,21 +1,19 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2020-2021, Univention GmbH
+# Copyright: (c) 2020-2026, Univention GmbH
 # Written by Lukas Zumvorde <zumvorde@univention.de>, Jan-Luca Kiok <kiok@univention.de>
 # Based on univention_apps module written by Alexander Ulpts <ulpts@univention.de>
 
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
-from __future__ import (absolute_import, division, print_function)
-__metaclass__ = type
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.2',
     'status': ['preview'],
-    'supported_by': 'comunity'
+    'supported_by': 'community'
 }
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: univention_directory_manager
 
@@ -90,9 +88,9 @@ options:
 author:
     - Lukas Zumvorde
     - Jan-Luca Kiok
-'''
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 # create a new user object
 - name: create a user
   univention_directory_manager:
@@ -194,9 +192,9 @@ EXAMPLES = r'''
     unset_properties:
       - property: 'groups'
         value: 'cn=local users,cn=groups,$ldap_base'
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 meta['changed_objects']:
     description: A list of all objects that were changed.
 meta['created']:
@@ -207,10 +205,10 @@ meta['modified']:
     description: The modified object and his changed attributes.
 msg:
     description: A human-readable information about which objects were changed.
-'''
+"""
 
 import re  # noqa: E402
-import traceback # noqa F401
+import traceback  # noqa F401
 
 from ansible.module_utils.basic import AnsibleModule  # noqa F401
 from ansible.module_utils.common.text.converters import to_native  # noqa F401
@@ -225,9 +223,8 @@ except ModuleNotFoundError:
     UDM_IMP_ERR = traceback.format_exc()
 
 
-class UDMAnsibleModule():
-    '''UDMAnsibleModule
-    '''
+class UDMAnsibleModule:
+    """UDMAnsibleModule"""
 
     udm_api_version = 2
     udm_module = None
@@ -244,7 +241,7 @@ class UDMAnsibleModule():
             created={},
             removed={},
             modified={},
-            ),
+        ),
         msg='',
     )
 
@@ -359,10 +356,7 @@ class UDMAnsibleModule():
         return value
 
     def _set_property(self, obj, prop, value):
-        self._try_function(
-            setattr,
-            obj.props, prop, self._decode_value(obj, prop, value)
-        )
+        self._try_function(setattr, obj.props, prop, self._decode_value(obj, prop, value))
 
     @staticmethod
     def _as_list(value):
@@ -453,9 +447,7 @@ class UDMAnsibleModule():
             obj.options = self.ansible_params['options']
 
     def _create_object(self):
-        obj = self.udm_module.new(
-            superordinate=self.ansible_params.get('superordinate')
-        )
+        obj = self.udm_module.new(superordinate=self.ansible_params.get('superordinate'))
         if self.ansible_params['position']:
             obj.position = self.ansible_params['position']
         self._apply_options(obj)
@@ -466,9 +458,7 @@ class UDMAnsibleModule():
                 prop_value = attr['value']
                 self._set_property(obj, prop_name, prop_value)
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.save
-            )
+            self._try_function(obj.save)
             self.changed_objects.append(obj.dn)
             self._set_changes(obj, obj.dn, 'new')
 
@@ -485,21 +475,17 @@ class UDMAnsibleModule():
                 prop_name = attr['property']
                 prop_value = attr['value']
                 self._merge_property(obj, prop_name, prop_value)
-                if prop_name == "password":
-                    self._set_property(obj, "overridePWHistory", "1")
+                if prop_name == 'password':
+                    self._set_property(obj, 'overridePWHistory', '1')
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.save
-            )
+            self._try_function(obj.save)
             self.changed_objects.append(obj.dn)
             self._set_changes(obj, obj.dn, 'new')
 
     def _remove_objects(self, obj):
         self._set_changes(obj, obj.dn, 'old')
         if not self.ansible_module.check_mode:
-            self._try_function(
-                obj.delete
-            )
+            self._try_function(obj.delete)
             self.changed_objects.append(obj.dn)
 
     def _detect_changes(self):
@@ -509,12 +495,12 @@ class UDMAnsibleModule():
         if _new and not _old:
             # obj created
             self.result['meta']['created'] = _new
-            self.result['msg'] = "created objects: {}".format(' '.join(self.changed_objects))
+            self.result['msg'] = 'created objects: {}'.format(' '.join(self.changed_objects))
             self.result['changed'] = True
         elif _old and not _new:
             # obj removed
             self.result['meta']['removed'] = _old
-            self.result['msg'] = "removed objects: {}".format(' '.join(self.changed_objects))
+            self.result['msg'] = 'removed objects: {}'.format(' '.join(self.changed_objects))
             self.result['changed'] = True
         elif _new and _old:
             # obj modified
@@ -538,10 +524,10 @@ class UDMAnsibleModule():
                             changed = True
             if changed:
                 self.result['meta']['modified'] = _diff
-                self.result['msg'] = "modified objects: {}".format(' '.join(self.changed_objects))
+                self.result['msg'] = 'modified objects: {}'.format(' '.join(self.changed_objects))
                 self.result['changed'] = True
         if not self.result['changed']:
-            self.result['msg'] = "nothing changed"
+            self.result['msg'] = 'nothing changed'
 
     def run(self):
         # univention module
