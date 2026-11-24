@@ -40,7 +40,7 @@ policies (list) | | A list of policies to apply to the given object. You have to
 - **Exception, dict values overwrite:** if the value is a dictionary (e.g. `displayName` with `en_US: ...`, `de_DE: ...`), the property is **set as a whole** and replaces the existing value. It is not merged.
 - Multivalued properties with complex entries (e.g. `homePostalAddress`, `translationShortDescription`) must be provided as a list of lists, e.g. `[["street", "zip", "city"]]`. A flat list is taken as several separate values.
 - `unset_properties`:
-  - Only `property`: all values of the property are removed.
+  - Only `property`: all values of the property are removed. There is no wildcard, a `value` like `*` is compared literally. To clear a property, just omit `value`.
   - `property` and `value` (single value or list): only these values are removed, all others are kept. DN values are compared case-insensitively.
   - For single-valued properties `value` is ignored and the property is always unset.
 - Some values cannot be removed because UDM requires them, e.g. the primary group of a user always stays in `groups`.
@@ -140,6 +140,16 @@ policies (list) | | A list of policies to apply to the given object. You have to
     unset_properties:
       - property: 'groups'
         value: 'cn=local users,cn=groups,$ldap_base'
+
+# remove all values of a multivalued property
+# (no wildcard needed: omit `value`; the primary group of a user always remains)
+- name: modify testuser3 - remove all groups
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
 
 # assign a policy
 - name: modify testuser3 - assign policy
