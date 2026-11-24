@@ -138,6 +138,36 @@
       - "groups_after_replace.stdout is not search('cn=mvgroup2,')"
   when: "not ansible_check_mode"
 
+- name: "Modify testuser1 - add the second group again"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: "cn=mvgroup2,cn=groups,{{ base_dn.stdout }}"
+
+- name: "Modify testuser1 - remove all values of a multivalued property (unset without value)"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    unset_properties:
+      - property: "groups"
+  register: "groups_unset_all"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_unset_all"
+  changed_when: false
+
+- name: "Check that all non-primary groups were removed"
+  ansible.builtin.assert:
+    that:
+      - "groups_unset_all is changed"
+      - "groups_after_unset_all.stdout is not search('cn=mvgroup')"
+  when: "not ansible_check_mode"
+
 - name: "Delete a user with a search filter"
   univention_directory_manager:
     module: "users/user"
