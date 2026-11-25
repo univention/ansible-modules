@@ -35,11 +35,150 @@
       - property: "firstname"
         value: "does not matter"
 
+- name: "Create two groups for the multivalued property tests"
+  univention_directory_manager:
+    module: "groups/group"
+    state: "present"
+    set_properties:
+      - property: "name"
+        value: "{{ item }}"
+  loop:
+    - "mvgroup1"
+    - "mvgroup2"
+
+- name: "Modify testuser1 - add first group (multivalued property)"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: "cn=mvgroup1,cn=groups,{{ base_dn.stdout }}"
+  register: "groups_add_1"
+
+- name: "Modify testuser1 - add second group, the first one must be kept"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: "cn=mvgroup2,cn=groups,{{ base_dn.stdout }}"
+  register: "groups_add_2"
+
+- name: "Modify testuser1 - add the same group again as a list with a lowercase DN"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: ["{{ ('cn=mvgroup2,cn=groups,' ~ base_dn.stdout) | lower }}"]
+  register: "groups_add_again"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_add"
+  changed_when: false
+
+- name: "Check that both groups are present and adding is idempotent"
+  ansible.builtin.assert:
+    that:
+      - "groups_add_1 is changed"
+      - "groups_add_2 is changed"
+      - "groups_add_again is not changed"
+      - "groups_after_add.stdout is search('cn=mvgroup1,')"
+      - "groups_after_add.stdout is search('cn=mvgroup2,')"
+      - "groups_after_add.stdout_lines | select('search', 'groups: cn=mvgroup2,') | list | length == 1"
+  when: "not ansible_check_mode"
+
+- name: "Modify testuser1 - remove only the first group, using a lowercase DN"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    unset_properties:
+      - property: "groups"
+        value: "{{ ('cn=mvgroup1,cn=groups,' ~ base_dn.stdout) | lower }}"
+  register: "groups_unset_1"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_unset"
+  changed_when: false
+
+- name: "Check that only the given group was removed"
+  ansible.builtin.assert:
+    that:
+      - "groups_unset_1 is changed"
+      - "groups_after_unset.stdout is not search('cn=mvgroup1,')"
+      - "groups_after_unset.stdout is search('cn=mvgroup2,')"
+  when: "not ansible_check_mode"
+
+- name: "Modify testuser1 - replace all groups (unset and set in the same task)"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    unset_properties:
+      - property: "groups"
+    set_properties:
+      - property: "groups"
+        value: ["cn=mvgroup1,cn=groups,{{ base_dn.stdout }}"]
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_replace"
+  changed_when: false
+
+- name: "Check that the groups were replaced"
+  ansible.builtin.assert:
+    that:
+      - "groups_after_replace.stdout is search('cn=mvgroup1,')"
+      - "groups_after_replace.stdout is not search('cn=mvgroup2,')"
+  when: "not ansible_check_mode"
+
+- name: "Modify testuser1 - add the second group again"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    set_properties:
+      - property: "groups"
+        value: "cn=mvgroup2,cn=groups,{{ base_dn.stdout }}"
+
+- name: "Modify testuser1 - remove all values of a multivalued property (unset without value)"
+  univention_directory_manager:
+    module: "users/user"
+    state: "present"
+    filter: "(uid=testuser1)"
+    unset_properties:
+      - property: "groups"
+  register: "groups_unset_all"
+
+- name: "Get groups of testuser1"
+  ansible.builtin.command: "udm users/user list --filter uid=testuser1 --properties groups"
+  register: "groups_after_unset_all"
+  changed_when: false
+
+- name: "Check that all non-primary groups were removed"
+  ansible.builtin.assert:
+    that:
+      - "groups_unset_all is changed"
+      - "groups_after_unset_all.stdout is not search('cn=mvgroup')"
+  when: "not ansible_check_mode"
+
 - name: "Delete a user with a search filter"
   univention_directory_manager:
     module: "users/user"
     state: "absent"
     filter: "(uid=testuser1)"
+
+- name: "Delete the groups of the multivalued property tests"
+  univention_directory_manager:
+    module: "groups/group"
+    state: "absent"
+    filter: "(cn=mvgroup*)"
 
 - name: "Create a custom OU"
   univention_directory_manager:

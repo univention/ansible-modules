@@ -26,11 +26,42 @@ dn (string) | | The distinguished name of the LDAP object.
 filter (string) | | A LDAP search filter to select objects.
 state (string) | "present" | Either 'present' for creating of modifying the objects given or 'absent' for deleting the objects.
 +superordinate (string) | None | When creating a new object, set its superordinate to this DN. Only affects newly created LDAP objects, this option is ingored for modifications and removals of existing entries.
-set_properties (list) | | A list of dictionaries with the keys property and value. Properties of the objects are to be set to the given values.
-unset_properties (list) | | A list of dictionaries with the key property. The listed properties of the objects are to be unset.
+set_properties (list) | | A list of dictionaries with the keys property and value. Properties of the objects are to be set to the given values. For multivalued properties of existing objects the values are added to the existing ones (see Notes).
+unset_properties (list) | | A list of dictionaries with the key property and optional key value. The listed properties are unset. For multivalued properties with a value, only that value is removed; without value all values are removed.
 policies (list) | | A list of policies to apply to the given object. You have to define all policies you expect at the users object.
 
 ## Notes
+
+### Multivalued properties
+
+- `set_properties`: for a multivalued property (e.g. `groups`) of an **existing** object the given value, a single value or a list of values, is **added** to the existing values. Existing values are kept and nothing is removed. Values already present are not duplicated, so repeated runs are idempotent. To remove values, use `unset_properties`.
+- DN values (e.g. group DNs) are compared case-insensitively, so `cn=domain users,...` matches `cn=Domain Users,...`.
+- When an object is **created**, the values are set as given.
+- **Exception, dict values overwrite:** if the value is a dictionary (e.g. `displayName` with `en_US: ...`, `de_DE: ...`), the property is **set as a whole** and replaces the existing value. It is not merged.
+- Multivalued properties with complex entries (e.g. `homePostalAddress`, `translationShortDescription`) must be provided as a list of lists, e.g. `[["street", "zip", "city"]]`. A flat list is taken as several separate values.
+- `unset_properties`:
+  - Only `property`: all values of the property are removed. There is no wildcard, a `value` like `*` is compared literally. To clear a property, just omit `value`.
+  - `property` and `value` (single value or list): only these values are removed, all others are kept. DN values are compared case-insensitively.
+  - For single-valued properties `value` is ignored and the property is always unset.
+- Some values cannot be removed because UDM requires them, e.g. the primary group of a user always stays in `groups`.
+- **Replace all values:** `unset_properties` is applied before `set_properties`, so unsetting a property and setting it in the same task replaces all its values:
+
+```yaml
+- name: set exactly these groups
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
+    set_properties:
+      - property: 'groups'
+        value:
+          - 'cn=group1,cn=groups,dc=example,dc=org'
+          - 'cn=group2,cn=groups,dc=example,dc=org'
+```
+
+> **Breaking change:** earlier versions replaced the values of a multivalued property in `set_properties`, and `unset_properties` ignored `value`. `value: []` or `value: None` no longer clears a multivalued property, use `unset_properties` without `value` for that.
 
 ## Examples
 
@@ -99,7 +130,26 @@ policies (list) | | A list of policies to apply to the given object. You have to
     filter: '(uid=testuser3)'
     unset_properties:
       - property: 'firstname'
-        value: 'does not matter'
+
+# remove a single value of a multivalued property
+- name: modify testuser3 - remove from one group only
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
+        value: 'cn=local users,cn=groups,$ldap_base'
+
+# remove all values of a multivalued property
+# (no wildcard needed: omit `value`; the primary group of a user always remains)
+- name: modify testuser3 - remove all groups
+  univention_directory_manager:
+    module: 'users/user'
+    state: 'present'
+    filter: '(uid=testuser3)'
+    unset_properties:
+      - property: 'groups'
 
 # assign a policy
 - name: modify testuser3 - assign policy
